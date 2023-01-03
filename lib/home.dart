@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as image;
 import 'package:siv/viewer.dart';
 import 'package:wakelock/wakelock.dart';
@@ -28,6 +27,9 @@ class _HomeState extends State<Home> {
   Future<void> _enableWakelock() async {
     try {
       await Wakelock.enable();
+      if (kDebugMode) {
+        print('Wakelock enabled.');
+      }
     } on PlatformException {
       if (kDebugMode) {
         print("Wakelock not supported on this platform.");
@@ -37,7 +39,10 @@ class _HomeState extends State<Home> {
 
   Future<void> _disableWakelock() async {
     if (await Wakelock.enabled) {
-      Wakelock.disable();
+      await Wakelock.disable();
+      if (kDebugMode) {
+        print('Wakelock disabled.');
+      }
     }
   }
 
