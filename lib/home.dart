@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,9 +21,8 @@ class _HomeState extends State<Home> {
   late Future<image.Image> _image;
 
   Future<image.Image> _loadImage() async {
-    final rsp = await http.get(Uri.parse(
-        'https://chat.openai.com/_next/image?url=https%3A%2F%2Fs.gravatar.com%2Favatar%2F4eef6ac4f1e3d53b75375bc4509a3ba1%3Fs%3D480%26r%3Dpg%26d%3Dhttps%253A%252F%252Fcdn.auth0.com%252Favatars%252Fyi.png&w=32&q=75'));
-    return image.decodeImage(rsp.bodyBytes) ?? image.Image.empty();
+    final file = File.fromUri(widget.uri);
+    return image.decodeImage(await file.readAsBytes()) ?? image.Image.empty();
   }
 
   Future<void> _enableWakelock() async {
@@ -60,9 +61,9 @@ class _HomeState extends State<Home> {
         child: FutureBuilder(
           future: _image,
           builder: (context, snapshot) {
-            var imageData = snapshot.data?.toUint8List();
-            return snapshot.hasData && (imageData != null)
-                ? Viewer(imageBytes: imageData)
+            var image = snapshot.data;
+            return snapshot.hasData && (image != null)
+                ? Viewer(image: image)
                 : const CircularProgressIndicator();
           },
         ),
