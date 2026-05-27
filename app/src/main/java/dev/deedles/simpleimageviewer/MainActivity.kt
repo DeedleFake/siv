@@ -98,8 +98,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun extractImageUri(intent: Intent): Uri? {
-        if (intent.action != Intent.ACTION_VIEW) return null
-        return intent.data
+        return when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            }
+            else -> null
+        }
     }
 
     /**
