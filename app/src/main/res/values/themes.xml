@@ -3,7 +3,7 @@
         Theme for a modern Jetpack Compose + Material 3 fullscreen image viewer.
         NoActionBar because Compose owns the UI. Black background is ideal for images.
     -->
-    <style name="Theme.SimpleImageViewer" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.SimpleImageViewer" parent="android:Theme.DeviceDefault.NoActionBar">
         <!-- Make the window background black so images look best during loading / letterboxing -->
         <item name="android:windowBackground">@android:color/black</item>
 

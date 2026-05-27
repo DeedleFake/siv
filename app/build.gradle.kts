@@ -68,10 +68,6 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.coil.svg)
 
-    // Legacy (kept temporarily for theme; will be removable later)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
