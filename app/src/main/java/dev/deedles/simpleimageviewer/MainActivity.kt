@@ -18,7 +18,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,8 +50,6 @@ import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * The single Activity for Simple Image Viewer.
@@ -249,8 +247,11 @@ fun ZoomableAsyncImage(
         offsetYAnim.snapTo(0f)
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = modifier
+            .onSizeChanged { size ->
+                containerSize = Offset(size.width.toFloat(), size.height.toFloat())
+            }
             .pointerInput(uri) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
@@ -295,8 +296,6 @@ fun ZoomableAsyncImage(
                 translationY = offsetYAnim.value
             }
     ) {
-        containerSize = Offset(maxWidth.value, maxHeight.value)
-
         AsyncImage(
             model = request,
             imageLoader = imageLoader,
