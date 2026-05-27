@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // Do NOT apply kotlin-android here — AGP 9+ has built-in Kotlin support.
+    // Applying it causes: "Cannot add extension with name 'kotlin'..."
     alias(libs.plugins.kotlin.compose)
 }
 

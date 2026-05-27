@@ -257,7 +257,7 @@ fun ZoomableAsyncImage(
                         scope.launch {
                             val targetScale = if (scale > 1.15f) 1f else 2.8f
 
-                            val center = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
+                            val center = Offset(size.width / 2f, size.height / 2f)
                             val tapVector = tapOffset - center
 
                             val newOffset = if (targetScale <= 1f) {

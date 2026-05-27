@@ -1,6 +1,6 @@
 [versions]
 agp = "9.2.1"
-kotlin = "2.1.20"
+kotlin = "2.1.20"  # Used for the Compose compiler plugin (AGP 9 has built-in Kotlin support)
 composeBom = "2025.05.00"
 coreKtx = "1.16.0"
 junit = "4.13.2"
@@ -39,6 +39,6 @@ coil-kt-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okht
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# kotlin-android is no longer needed (AGP 9+ has built-in Kotlin support)
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
