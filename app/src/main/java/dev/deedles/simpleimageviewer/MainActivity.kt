@@ -8,12 +8,16 @@ import android.os.Bundle
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -74,6 +78,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 ImageViewerApp(
                     uri = imageUri,
+                    onImageSelected = { imageUri = it },
                     onOrientationForImage = { w, h -> setOptimalOrientation(w, h) }
                 )
             }
@@ -122,9 +127,30 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ImageViewerApp(
     uri: Uri?,
+    onImageSelected: (Uri) -> Unit,
     onOrientationForImage: (width: Int, height: Int) -> Unit
 ) {
     val context = LocalContext.current
+
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { selectedUri ->
+            if (selectedUri != null) {
+                onImageSelected(selectedUri)
+            }
+        }
+    )
+
+    val launchPicker = {
+        pickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    // Auto-launch if no URI is provided on startup
+    LaunchedEffect(uri) {
+        if (uri == null) {
+            launchPicker()
+        }
+    }
 
     // Hide system bars for true fullscreen / immersive experience
     LaunchedEffect(Unit) {
@@ -148,19 +174,21 @@ fun ImageViewerApp(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            EmptyState()
+            EmptyState(onOpenPicker = launchPicker)
         }
     }
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(onOpenPicker: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { onOpenPicker() },
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "No image selected\n\nOpen this app from your gallery, file manager, or any app that can share images.",
+            text = "No image selected\n\nTap to choose an image, or open one from your gallery or file manager.",
             color = Color.White.copy(alpha = 0.65f),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
