@@ -12,13 +12,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -192,30 +190,13 @@ fun ZoomableAsyncImage(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Zoom state
+    // Zoom state - mutable states for high-performance gesture tracking
     var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-
-    // For smooth double-tap animation
-    val scaleAnim = remember { Animatable(1f) }
-    val offsetXAnim = remember { Animatable(0f) }
-    val offsetYAnim = remember { Animatable(0f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
 
     // We need the container size to do proper clamping
     var containerSize by remember { mutableStateOf(Offset(1f, 1f)) }
-
-    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        val newScale = (scale * zoomChange).coerceIn(0.6f, 8f)
-        val scaleFactor = if (scale == 0f) 1f else newScale / scale
-
-        offset = Offset(
-            x = offset.x * scaleFactor + offsetChange.x,
-            y = offset.y * scaleFactor + offsetChange.y
-        )
-
-        scale = newScale
-        offset = clampOffset(offset, scale, containerSize)
-    }
 
     // Create a good ImageLoader for large photos (viewer use case)
     val imageLoader = remember {
@@ -234,10 +215,8 @@ fun ZoomableAsyncImage(
     LaunchedEffect(uri) {
         // Reset zoom state when a completely new image arrives
         scale = 1f
-        offset = Offset.Zero
-        scaleAnim.snapTo(1f)
-        offsetXAnim.snapTo(0f)
-        offsetYAnim.snapTo(0f)
+        offsetX = 0f
+        offsetY = 0f
     }
 
     Box(
@@ -246,47 +225,58 @@ fun ZoomableAsyncImage(
                 containerSize = Offset(size.width.toFloat(), size.height.toFloat())
             }
             .pointerInput(uri) {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    val center = Offset(containerSize.x / 2f, containerSize.y / 2f)
+                    val newScale = (scale * zoom).coerceIn(1f, 8f)
+                    val zoomFactor = if (scale == 0f) 1f else newScale / scale
+
+                    // Zoom towards the centroid for a natural feel
+                    val targetOffset = (Offset(offsetX, offsetY) + (center - centroid)) * zoomFactor - (center - centroid) + pan
+                    val clamped = clampOffset(targetOffset, newScale, containerSize)
+
+                    scale = newScale
+                    offsetX = clamped.x
+                    offsetY = clamped.y
+                }
+            }
+            .pointerInput(uri) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
                         scope.launch {
-                            val targetScale = if (scale > 1.15f) 1f else 2.8f
+                            val targetScale = if (scale > 1.15f) 1f else 3f
+                            val center = Offset(containerSize.x / 2f, containerSize.y / 2f)
 
-                            val center = Offset(size.width / 2f, size.height / 2f)
-                            val tapVector = tapOffset - center
-
-                            val newOffset = if (targetScale <= 1f) {
+                            val targetOffset = if (targetScale <= 1f) {
                                 Offset.Zero
                             } else {
-                                // Bring the tapped point toward the center as we zoom in
-                                -tapVector * (targetScale - 1f) * 0.55f
+                                (center - tapOffset) * (targetScale - 1f)
                             }
 
-                            val spec: AnimationSpec<Float> = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
+                            val clamped = clampOffset(targetOffset, targetScale, containerSize)
+                            val startScale = scale
+                            val startOffset = Offset(offsetX, offsetY)
 
-                            launch { scaleAnim.animateTo(targetScale, spec) }
-                            launch { offsetXAnim.animateTo(newOffset.x, spec) }
-                            launch { offsetYAnim.animateTo(newOffset.y, spec) }
-
-                            // Drive the actual state from the animatables
-                            scaleAnim.value.let { s ->
-                                val factor = if (scale == 0f) 1f else s / scale
-                                offset = Offset(offset.x * factor, offset.y * factor) + (newOffset - offset) * 0.6f
+                            val anim = Animatable(0f)
+                            anim.animateTo(
+                                targetValue = 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                )
+                            ) {
+                                scale = startScale + (targetScale - startScale) * value
+                                offsetX = startOffset.x + (clamped.x - startOffset.x) * value
+                                offsetY = startOffset.y + (clamped.y - startOffset.y) * value
                             }
-                            scale = scaleAnim.value
-                            offset = clampOffset(Offset(offsetXAnim.value, offsetYAnim.value), scale, containerSize)
                         }
                     }
                 )
             }
-            .transformable(state = transformableState)
             .graphicsLayer {
-                scaleX = scaleAnim.value
-                scaleY = scaleAnim.value
-                translationX = offsetXAnim.value
-                translationY = offsetYAnim.value
+                scaleX = scale
+                scaleY = scale
+                translationX = offsetX
+                translationY = offsetY
             }
     ) {
         AsyncImage(
@@ -313,9 +303,9 @@ fun ZoomableAsyncImage(
 private fun clampOffset(offset: Offset, scale: Float, container: Offset): Offset {
     if (scale <= 1f) return Offset.Zero
 
-    // Allow panning but always keep a portion of the image visible
-    val maxX = container.x * (scale - 1f) * 0.85f
-    val maxY = container.y * (scale - 1f) * 0.85f
+    // Max translation is half the extra width/height created by scaling
+    val maxX = container.x * (scale - 1f) / 2f
+    val maxY = container.y * (scale - 1f) / 2f
 
     return Offset(
         x = offset.x.coerceIn(-maxX, maxX),
