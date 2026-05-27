@@ -61,11 +61,13 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : ComponentActivity() {
 
-    private var lastHandledUri: Uri? = null
+    private var imageUri by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        imageUri = extractImageUri(intent)
 
         // Allow drawing under cutouts and system bars (we control visibility ourselves)
         @Suppress("DEPRECATION")
@@ -82,29 +84,17 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 ImageViewerApp(
-                    initialUri = extractImageUri(intent),
+                    uri = imageUri,
                     onOrientationForImage = { w, h -> setOptimalOrientation(w, h) }
                 )
             }
         }
-
-        handleNewIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleNewIntent(intent)
-    }
-
-    private fun handleNewIntent(intent: Intent) {
-        val uri = extractImageUri(intent)
-        if (uri != null && uri != lastHandledUri) {
-            lastHandledUri = uri
-            // Recreate is the simplest way to get a fresh composition with the new image
-            // while keeping the single-activity contract simple.
-            recreate()
-        }
+        imageUri = extractImageUri(intent)
     }
 
     private fun extractImageUri(intent: Intent): Uri? {
@@ -137,11 +127,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ImageViewerApp(
-    initialUri: Uri?,
+    uri: Uri?,
     onOrientationForImage: (width: Int, height: Int) -> Unit
 ) {
     val context = LocalContext.current
-    var imageUri by remember { mutableStateOf(initialUri) }
 
     // Hide system bars for true fullscreen / immersive experience
     LaunchedEffect(Unit) {
@@ -158,9 +147,9 @@ fun ImageViewerApp(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        if (imageUri != null) {
+        if (uri != null) {
             ZoomableAsyncImage(
-                uri = imageUri!!,
+                uri = uri,
                 onImageSizeDetermined = onOrientationForImage,
                 modifier = Modifier.fillMaxSize()
             )
