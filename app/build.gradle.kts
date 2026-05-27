@@ -65,6 +65,7 @@ dependencies {
     // Coil 3
     implementation(libs.coil.kt.compose)
     implementation(libs.coil.kt.network.okhttp)
+    implementation("io.coil-kt.coil3:coil-gif:3.4.0")
 
     // Legacy (kept temporarily for theme; will be removable later)
     implementation(libs.androidx.appcompat)
