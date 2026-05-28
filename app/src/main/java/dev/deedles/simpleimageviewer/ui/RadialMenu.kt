@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -28,17 +29,12 @@ import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 data class RadialMenuItem(
     val label: String,
     val onSelect: () -> Unit
 )
 
-/**
- * A "stealth" radial menu that appears on a two-finger long press.
- * The user holds, drags to an item, and releases to select.
- */
 @Composable
 fun RadialMenu(
     items: List<RadialMenuItem>,
@@ -61,32 +57,31 @@ fun RadialMenu(
             .pointerInput(items) {
                 awaitPointerEventScope {
                     while (true) {
-                        val event = awaitPointerEvent()
+                        // Use Initial pass to intercept before ZoomableAsyncImage
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
                         val changes = event.changes
                         
-                        // We are looking for exactly 2 fingers
                         if (changes.size == 2 && menuCenter == null) {
                             val centroid = Offset(
                                 (changes[0].position.x + changes[1].position.x) / 2,
                                 (changes[0].position.y + changes[1].position.y) / 2
                             )
                             
-                            // Check for long press (held for 500ms without much movement)
                             val startTime = System.currentTimeMillis()
                             var isLongPress = true
                             
+                            // Tighter slop: If they move more than 10 pixels, cancel menu
                             while (System.currentTimeMillis() - startTime < 400) {
-                                val moveEvent = awaitPointerEvent()
+                                val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
                                 if (moveEvent.changes.size != 2) {
                                     isLongPress = false
                                     break
                                 }
-                                // If fingers move too far, it's a zoom/pan, not a menu trigger
                                 val newCentroid = Offset(
                                     (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
                                     (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
                                 )
-                                if ((newCentroid - centroid).getDistance() > 20f) {
+                                if ((newCentroid - centroid).getDistance() > 10f) {
                                     isLongPress = false
                                     break
                                 }
@@ -97,9 +92,11 @@ fun RadialMenu(
                                 currentTouch = centroid
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 
-                                // Now track the movement until release
+                                // Menu is active! Consume everything to stop zooming
                                 while (true) {
-                                    val dragEvent = awaitPointerEvent()
+                                    val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
+                                    dragEvent.changes.forEach { it.consume() }
+
                                     if (dragEvent.type == PointerEventType.Release || dragEvent.changes.isEmpty()) {
                                         if (selectedIndex != -1) {
                                             items[selectedIndex].onSelect()
@@ -110,33 +107,28 @@ fun RadialMenu(
                                         break
                                     }
                                     
-                                    val newCentroid = Offset(
+                                    currentTouch = Offset(
                                         dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
                                         dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
                                     )
-                                    currentTouch = newCentroid
                                     
-                                    // Calculate selection based on angle
                                     val diff = currentTouch - menuCenter!!
                                     val dist = diff.getDistance()
                                     
-                                    if (dist > with(density) { 40.dp.toPx() }) {
+                                    if (dist > with(density) { 30.dp.toPx() }) {
                                         val angle = atan2(diff.y, diff.x) * 180 / PI
-                                        // Normalize angle to 0..360 starting from -90 (top)
+                                        // Normalize: 0 is Top, 90 is Right, etc.
                                         val normalizedAngle = (angle + 90 + 360) % 360
                                         val sliceSize = 360f / items.size
-                                        val newIndex = (normalizedAngle / sliceSize).toInt() % items.size
+                                        val newIndex = ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
                                         
-                                        if (newIndex != selectedIndex) {
+                                        if (newIndex != selectedIndex && newIndex < items.size) {
                                             selectedIndex = newIndex
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         }
                                     } else {
                                         selectedIndex = -1
                                     }
-                                    
-                                    // Consume events while menu is active so image doesn't zoom
-                                    dragEvent.changes.forEach { it.consume() }
                                 }
                             }
                         }
@@ -151,24 +143,23 @@ fun RadialMenu(
                 val center = menuCenter!!
                 val radius = 100.dp.toPx()
                 
-                // Draw background circle
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.4f * menuAlpha),
+                    color = Color.Black.copy(alpha = 0.5f * menuAlpha),
                     radius = radius + 20.dp.toPx(),
                     center = center
                 )
                 
                 items.forEachIndexed { index, item ->
                     val sliceAngle = 360f / items.size
-                    val startAngle = index * sliceAngle - 90f - (sliceAngle / 2f)
+                    val midAngle = index * sliceAngle - 90f
+                    val startAngle = midAngle - (sliceAngle / 2f)
                     
                     val isSelected = index == selectedIndex
                     val color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f)
                     
-                    // Draw slice indicator
                     if (isSelected) {
                         drawArc(
-                            color = Color.White.copy(alpha = 0.2f),
+                            color = Color.White.copy(alpha = 0.25f),
                             startAngle = startAngle,
                             sweepAngle = sliceAngle,
                             useCenter = true,
@@ -177,17 +168,15 @@ fun RadialMenu(
                         )
                     }
 
-                    // Calculate text position
-                    val midAngle = index * sliceAngle - 90f
                     val textRad = midAngle * PI / 180
                     val textPos = Offset(
-                        center.x + (radius * 0.7f * cos(textRad)).toFloat(),
-                        center.y + (radius * 0.7f * sin(textRad)).toFloat()
+                        center.x + (radius * 0.65f * cos(textRad)).toFloat(),
+                        center.y + (radius * 0.65f * sin(textRad)).toFloat()
                     )
                     
                     val textLayout = textMeasurer.measure(
                         item.label,
-                        style = TextStyle(color = color, fontSize = if (isSelected) 18.sp else 16.sp)
+                        style = TextStyle(color = color, fontSize = if (isSelected) 17.sp else 15.sp)
                     )
                     
                     drawText(
@@ -196,9 +185,8 @@ fun RadialMenu(
                     )
                 }
                 
-                // Outer ring
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.2f * menuAlpha),
+                    color = Color.White.copy(alpha = 0.3f * menuAlpha),
                     radius = radius,
                     center = center,
                     style = Stroke(width = 2.dp.toPx())

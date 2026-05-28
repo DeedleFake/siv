@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +41,9 @@ fun ImageViewerScreen(
 
     var isMaxBrightness by rememberSaveable { mutableStateOf(false) }
     var isAutoRotateEnabled by rememberSaveable { mutableStateOf(true) }
+    
+    // Store image dimensions to re-apply orientation when toggling auto-rotate
+    var imageSize by remember { mutableStateOf<Size?>(null) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -54,14 +58,12 @@ fun ImageViewerScreen(
         pickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
-    // Auto-launch if no URI is provided on startup
     LaunchedEffect(uri) {
         if (uri == null) {
             launchPicker()
         }
     }
 
-    // Hide system bars for true fullscreen / immersive experience
     LaunchedEffect(Unit) {
         (context as? Activity)?.window?.let { window ->
             val controller = window.insetsController
@@ -71,7 +73,6 @@ fun ImageViewerScreen(
         }
     }
 
-    // Apply brightness side-effect
     LaunchedEffect(isMaxBrightness) {
         (context as? Activity)?.window?.let { window ->
             window.attributes = window.attributes.apply {
@@ -80,7 +81,7 @@ fun ImageViewerScreen(
         }
     }
 
-    val radialMenuItems = remember(isMaxBrightness, isAutoRotateEnabled) {
+    val radialMenuItems = remember(isMaxBrightness, isAutoRotateEnabled, imageSize) {
         listOf(
             RadialMenuItem(
                 label = if (isMaxBrightness) "Brightness: MAX" else "Brightness: AUTO",
@@ -91,7 +92,10 @@ fun ImageViewerScreen(
                 onSelect = { 
                     isAutoRotateEnabled = !isAutoRotateEnabled
                     if (!isAutoRotateEnabled) {
-                        onOrientationForImage(0, 0) // Signal to reset orientation
+                        onOrientationForImage(0, 0)
+                    } else {
+                        // Re-trigger rotation with stored size
+                        imageSize?.let { onOrientationForImage(it.width.toInt(), it.height.toInt()) }
                     }
                 }
             )
@@ -108,6 +112,7 @@ fun ImageViewerScreen(
                 ZoomableAsyncImage(
                     uri = uri,
                     onImageSizeDetermined = { w, h ->
+                        imageSize = Size(w.toFloat(), h.toFloat())
                         if (isAutoRotateEnabled) {
                             onOrientationForImage(w, h)
                         }
