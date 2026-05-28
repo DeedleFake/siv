@@ -146,6 +146,7 @@ fun RadialMenu(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val center = menuCenter!!
                 val radius = 100.dp.toPx()
+                val cancelRadius = 30.dp.toPx()
                 
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.5f * menuAlpha),
@@ -162,13 +163,16 @@ fun RadialMenu(
                     val color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f)
                     
                     if (isSelected) {
+                        val strokeWidth = radius - cancelRadius
+                        val arcPathRadius = cancelRadius + (strokeWidth / 2f)
                         drawArc(
                             color = Color.White.copy(alpha = 0.25f),
                             startAngle = startAngle,
                             sweepAngle = sliceAngle,
-                            useCenter = true,
-                            topLeft = Offset(center.x - radius, center.y - radius),
-                            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+                            useCenter = false,
+                            topLeft = Offset(center.x - arcPathRadius, center.y - arcPathRadius),
+                            size = androidx.compose.ui.geometry.Size(arcPathRadius * 2, arcPathRadius * 2),
+                            style = Stroke(width = strokeWidth)
                         )
                     }
 
@@ -197,7 +201,6 @@ fun RadialMenu(
                 )
 
                 // Draw central "Cancel" zone
-                val cancelRadius = 30.dp.toPx()
                 val isCancelSelected = selectedIndex == -1
                 
                 if (isCancelSelected) {
