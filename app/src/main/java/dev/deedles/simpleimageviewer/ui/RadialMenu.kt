@@ -195,6 +195,40 @@ fun RadialMenu(
                     center = center,
                     style = Stroke(width = 2.dp.toPx())
                 )
+
+                // Draw central "Cancel" zone
+                val cancelRadius = 30.dp.toPx()
+                val isCancelSelected = selectedIndex == -1
+                
+                if (isCancelSelected) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.15f),
+                        radius = cancelRadius,
+                        center = center
+                    )
+                }
+                
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.4f * menuAlpha),
+                    radius = cancelRadius,
+                    center = center,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+                
+                // Draw a small 'X' to indicate cancel
+                val xSize = 6.dp.toPx()
+                drawLine(
+                    color = Color.White.copy(alpha = 0.6f * menuAlpha),
+                    start = Offset(center.x - xSize, center.y - xSize),
+                    end = Offset(center.x + xSize, center.y + xSize),
+                    strokeWidth = 2.dp.toPx()
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.6f * menuAlpha),
+                    start = Offset(center.x + xSize, center.y - xSize),
+                    end = Offset(center.x - xSize, center.y + xSize),
+                    strokeWidth = 2.dp.toPx()
+                )
             }
         }
     }
