@@ -25,6 +25,9 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastSumBy
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -57,42 +60,37 @@ fun RadialMenu(
             .pointerInput(items) {
                 awaitPointerEventScope {
                     while (true) {
-                        // Use Initial pass to intercept before ZoomableAsyncImage
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val changes = event.changes
-                        
-                        if (changes.size == 2 && menuCenter == null) {
+                        // 1. Wait for exactly 2 fingers to go down
+                        val initialEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        if (initialEvent.changes.size == 2 && menuCenter == null) {
                             val centroid = Offset(
-                                (changes[0].position.x + changes[1].position.x) / 2,
-                                (changes[0].position.y + changes[1].position.y) / 2
+                                initialEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
+                                initialEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
                             )
                             
-                            val startTime = System.currentTimeMillis()
-                            var isLongPress = true
-                            
-                            // Tighter slop: If they move more than 10 pixels, cancel menu
-                            while (System.currentTimeMillis() - startTime < 400) {
-                                val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
-                                if (moveEvent.changes.size != 2) {
-                                    isLongPress = false
-                                    break
+                            // 2. Try to detect a long press (consistent 400ms timeout)
+                            val isLongPress = withTimeoutOrNull(400) {
+                                while (true) {
+                                    val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (moveEvent.changes.size != 2) break
+                                    
+                                    val newCentroid = Offset(
+                                        (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
+                                        (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
+                                    )
+                                    
+                                    // If fingers move significantly, it's a zoom. Abort menu.
+                                    if ((newCentroid - centroid).getDistance() > 15f) break
                                 }
-                                val newCentroid = Offset(
-                                    (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
-                                    (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
-                                )
-                                if ((newCentroid - centroid).getDistance() > 10f) {
-                                    isLongPress = false
-                                    break
-                                }
-                            }
-                            
+                                false
+                            } ?: true // If timeout expires, it's a long press
+
                             if (isLongPress) {
                                 menuCenter = centroid
                                 currentTouch = centroid
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 
-                                // Menu is active! Consume everything to stop zooming
+                                // 3. Menu active: Handle selection and consume all events
                                 while (true) {
                                     val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
                                     dragEvent.changes.forEach { it.consume() }
@@ -117,7 +115,6 @@ fun RadialMenu(
                                     
                                     if (dist > with(density) { 30.dp.toPx() }) {
                                         val angle = atan2(diff.y, diff.x) * 180 / PI
-                                        // Normalize: 0 is Top, 90 is Right, etc.
                                         val normalizedAngle = (angle + 90 + 360) % 360
                                         val sliceSize = 360f / items.size
                                         val newIndex = ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
@@ -129,6 +126,13 @@ fun RadialMenu(
                                     } else {
                                         selectedIndex = -1
                                     }
+                                }
+                            } else {
+                                // 4. Movement was detected: It's a zoom. 
+                                // Wait for all fingers to lift before allowing menu again.
+                                while (true) {
+                                    val releaseEvent = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (releaseEvent.changes.none { it.pressed }) break
                                 }
                             }
                         }
