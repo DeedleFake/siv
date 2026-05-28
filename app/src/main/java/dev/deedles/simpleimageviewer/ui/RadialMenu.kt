@@ -23,16 +23,10 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
 
 data class RadialMenuItem(
     val label: String,
@@ -50,7 +44,6 @@ fun RadialMenu(
     var selectedIndex by remember { mutableIntStateOf(-1) }
     
     val haptic = LocalHapticFeedback.current
-    val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     
     val menuAlpha by animateFloatAsState(if (menuCenter != null) 1f else 0f, label = "Alpha")
@@ -151,7 +144,7 @@ fun RadialMenu(
                 
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.65f * menuAlpha),
-                    radius = radius + 30.dp.toPx(),
+                    radius = radius + 20.dp.toPx(),
                     center = center
                 )
                 
