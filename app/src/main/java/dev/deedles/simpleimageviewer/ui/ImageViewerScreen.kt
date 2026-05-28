@@ -84,6 +84,10 @@ fun ImageViewerScreen(
     val radialMenuItems = remember(isMaxBrightness, isAutoRotateEnabled, imageSize) {
         listOf(
             RadialMenuItem(
+                label = "Open Image",
+                onSelect = { launchPicker() }
+            ),
+            RadialMenuItem(
                 label = if (isMaxBrightness) "Brightness: MAX" else "Brightness: AUTO",
                 onSelect = { isMaxBrightness = !isMaxBrightness }
             ),
