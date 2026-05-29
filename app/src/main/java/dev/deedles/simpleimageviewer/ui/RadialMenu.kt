@@ -40,7 +40,6 @@ fun RadialMenu(
     content: @Composable () -> Unit
 ) {
     var menuCenter by remember { mutableStateOf<Offset?>(null) }
-    var currentTouch by remember { mutableStateOf(Offset.Zero) }
     var selectedIndex by remember { mutableIntStateOf(-1) }
     
     val haptic = LocalHapticFeedback.current
@@ -51,88 +50,41 @@ fun RadialMenu(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(items) {
-                awaitPointerEventScope {
-                    while (true) {
-                        // 1. Wait for exactly 2 fingers to go down
-                        val initialEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        if (initialEvent.changes.size == 2 && menuCenter == null) {
-                            val centroid = Offset(
-                                initialEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
-                                initialEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
-                            )
-                            
-                            // 2. Try to detect a long press (consistent 400ms timeout)
-                            val isLongPress = withTimeoutOrNull(400) {
-                                while (true) {
-                                    val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
-                                    if (moveEvent.changes.size != 2) break
-                                    
-                                    val newCentroid = Offset(
-                                        (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
-                                        (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
-                                    )
-                                    
-                                    // If fingers move significantly, it's a zoom. Abort menu.
-                                    if ((newCentroid - centroid).getDistance() > 15f) break
-                                }
-                                false
-                            } ?: true // If timeout expires, it's a long press
+            .twoFingerLongPress(
+                key = items,
+                onLongPress = { centroid ->
+                    menuCenter = centroid
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
+                onMove = { touch ->
+                    menuCenter?.let { center ->
+                        val diff = touch - center
+                        val dist = diff.getDistance()
 
-                            if (isLongPress) {
-                                menuCenter = centroid
-                                currentTouch = centroid
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                
-                                // 3. Menu active: Handle selection and consume all events
-                                while (true) {
-                                    val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
-                                    dragEvent.changes.forEach { it.consume() }
+                        if (dist > with(density) { 30.dp.toPx() }) {
+                            val angle = atan2(diff.y, diff.x) * 180 / PI
+                            val normalizedAngle = (angle + 90 + 360) % 360
+                            val sliceSize = 360f / items.size
+                            val newIndex = ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
 
-                                    if (dragEvent.type == PointerEventType.Release || dragEvent.changes.isEmpty()) {
-                                        if (selectedIndex != -1) {
-                                            items[selectedIndex].onSelect()
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        }
-                                        menuCenter = null
-                                        selectedIndex = -1
-                                        break
-                                    }
-                                    
-                                    currentTouch = Offset(
-                                        dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
-                                        dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
-                                    )
-                                    
-                                    val diff = currentTouch - menuCenter!!
-                                    val dist = diff.getDistance()
-                                    
-                                    if (dist > with(density) { 30.dp.toPx() }) {
-                                        val angle = atan2(diff.y, diff.x) * 180 / PI
-                                        val normalizedAngle = (angle + 90 + 360) % 360
-                                        val sliceSize = 360f / items.size
-                                        val newIndex = ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
-                                        
-                                        if (newIndex != selectedIndex && newIndex < items.size) {
-                                            selectedIndex = newIndex
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        }
-                                    } else {
-                                        selectedIndex = -1
-                                    }
-                                }
-                            } else {
-                                // 4. Movement was detected: It's a zoom. 
-                                // Wait for all fingers to lift before allowing menu again.
-                                while (true) {
-                                    val releaseEvent = awaitPointerEvent(PointerEventPass.Initial)
-                                    if (releaseEvent.changes.none { it.pressed }) break
-                                }
+                            if (newIndex != selectedIndex && newIndex < items.size) {
+                                selectedIndex = newIndex
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             }
+                        } else {
+                            selectedIndex = -1
                         }
                     }
+                },
+                onRelease = {
+                    if (selectedIndex != -1) {
+                        items[selectedIndex].onSelect()
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    menuCenter = null
+                    selectedIndex = -1
                 }
-            }
+            )
     ) {
         content()
         
@@ -253,6 +205,71 @@ fun RadialMenu(
                     end = Offset(center.x - xSize, center.y + xSize),
                     strokeWidth = 2.dp.toPx()
                 )
+            }
+        }
+    }
+}
+
+private fun Modifier.twoFingerLongPress(
+    key: Any?,
+    onLongPress: (Offset) -> Unit,
+    onMove: (Offset) -> Unit,
+    onRelease: () -> Unit
+): Modifier = pointerInput(key) {
+    awaitPointerEventScope {
+        while (true) {
+            // 1. Wait for exactly 2 fingers to go down
+            val initialEvent = awaitPointerEvent(PointerEventPass.Initial)
+            if (initialEvent.changes.size == 2) {
+                val centroid = Offset(
+                    initialEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
+                    initialEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
+                )
+
+                // 2. Try to detect a long press (consistent 400ms timeout)
+                val isLongPress = withTimeoutOrNull(400) {
+                    while (true) {
+                        val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        if (moveEvent.changes.size != 2) break
+
+                        val newCentroid = Offset(
+                            (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
+                            (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
+                        )
+
+                        // If fingers move significantly, it's a zoom. Abort menu.
+                        if ((newCentroid - centroid).getDistance() > 15f) break
+                    }
+                    false
+                } ?: true // If timeout expires, it's a long press
+
+                if (isLongPress) {
+                    onLongPress(centroid)
+
+                    // 3. Menu active: Handle selection and consume all events
+                    while (true) {
+                        val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        dragEvent.changes.forEach { it.consume() }
+
+                        if (dragEvent.type == PointerEventType.Release || dragEvent.changes.isEmpty()) {
+                            onRelease()
+                            break
+                        }
+
+                        val currentTouch = Offset(
+                            dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
+                            dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
+                        )
+                        onMove(currentTouch)
+                    }
+                } else {
+                    // 4. Movement was detected: It's a zoom.
+                    // Wait for all fingers to lift before allowing menu again.
+                    while (true) {
+                        val releaseEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        if (releaseEvent.changes.none { it.pressed }) break
+                    }
+                }
             }
         }
     }
