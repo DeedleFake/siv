@@ -251,18 +251,29 @@ private fun Modifier.twoFingerLongPress(
             // 3. Menu active: Handle selection and consume all events
             while (true) {
                 val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
-                dragEvent.changes.forEach { it.consume() }
-
-                if (dragEvent.changes.none { it.pressed }) {
-                    onRelease()
-                    break
-                }
                 
+                // Calculate centroid of all pointers in this event (including ones that just went up)
                 val currentCentroid = Offset(
                     dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
                     dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
                 )
                 onMove(currentCentroid)
+
+                // Trigger release as soon as ANY finger is lifted
+                if (dragEvent.changes.any { !it.pressed }) {
+                    onRelease()
+                    
+                    // Consume all remaining events until ALL fingers are up
+                    dragEvent.changes.forEach { it.consume() }
+                    while (true) {
+                        val finalEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        finalEvent.changes.forEach { it.consume() }
+                        if (finalEvent.changes.none { it.pressed }) break
+                    }
+                    break
+                }
+
+                dragEvent.changes.forEach { it.consume() }
             }
         } else {
             // 4. Movement was detected before long press: It's a zoom/pan.
