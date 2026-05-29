@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -85,133 +86,196 @@ fun RadialMenu(
         content()
 
         if (menuAlpha > 0f && menuCenter != null) {
+            val center = menuCenter!!
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = menuCenter!!
-                val radius = MenuRadius.toPx()
-                val cancelRadius = CancelThreshold.toPx()
-
-                drawCircle(
-                    color = Color.Black.copy(alpha = 0.65f * menuAlpha),
-                    radius = radius + MenuBackgroundPadding.toPx(),
-                    center = center
-                )
-
-                items.forEachIndexed { index, item ->
-                    val sliceAngle = 360f / items.size
-                    val midAngle = index * sliceAngle - 90f
-                    val startAngle = midAngle - (sliceAngle / 2f)
-
-                    val isSelected = index == selectedIndex
-                    val color = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f)
-
-                    if (isSelected) {
-                        val strokeWidth = radius - cancelRadius
-                        val arcPathRadius = cancelRadius + (strokeWidth / 2f)
-                        drawArc(
-                            color = Color.White.copy(alpha = 0.2f),
-                            startAngle = startAngle,
-                            sweepAngle = sliceAngle,
-                            useCenter = false,
-                            topLeft = Offset(center.x - arcPathRadius, center.y - arcPathRadius),
-                            size = androidx.compose.ui.geometry.Size(
-                                arcPathRadius * 2,
-                                arcPathRadius * 2
-                            ),
-                            style = Stroke(width = strokeWidth)
-                        )
-                    }
-
-                    // Curved Text Implementation
-                    drawIntoCanvas { canvas ->
-                        val nativeCanvas = canvas.nativeCanvas
-                        val textRadius = cancelRadius + (radius - cancelRadius) * 0.55f
-
-                        val paint = android.graphics.Paint().apply {
-                            this.color = color.toArgb()
-                            this.textSize =
-                                with(density) { (if (isSelected) 16.sp else 14.sp).toPx() }
-                            this.isAntiAlias = true
-                            this.textAlign = android.graphics.Paint.Align.CENTER
-                            this.typeface = android.graphics.Typeface.create(
-                                android.graphics.Typeface.DEFAULT,
-                                if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
-                            )
-                        }
-
-                        val path = android.graphics.Path()
-                        val rect = android.graphics.RectF(
-                            center.x - textRadius,
-                            center.y - textRadius,
-                            center.x + textRadius,
-                            center.y + textRadius
-                        )
-
-                        // If the text is in the bottom half of the circle (0 to 180 degrees),
-                        // we need to reverse the arc so the text isn't upside down.
-                        val isBottomHalf = midAngle > -10 && midAngle < 190
-
-                        if (isBottomHalf) {
-                            // Bottom half: Path goes counter-clockwise, and we offset the radius
-                            // slightly so the text sits "on top" of the path instead of "hanging".
-                            val bottomRect = android.graphics.RectF(
-                                center.x - (textRadius + paint.textSize),
-                                center.y - (textRadius + paint.textSize),
-                                center.x + (textRadius + paint.textSize),
-                                center.y + (textRadius + paint.textSize)
-                            )
-                            path.addArc(bottomRect, midAngle + 90f, -180f)
-                            nativeCanvas.drawTextOnPath(item.label, path, 0f, 0f, paint)
-                        } else {
-                            // Top half: Normal clockwise path
-                            path.addArc(rect, midAngle - 90f, 180f)
-                            nativeCanvas.drawTextOnPath(item.label, path, 0f, 0f, paint)
-                        }
-                    }
-                }
-
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.3f * menuAlpha),
-                    radius = radius,
+                drawRadialMenu(
+                    items = items,
                     center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-
-                // Draw central "Cancel" zone
-                val isCancelSelected = selectedIndex == null
-
-                if (isCancelSelected) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.15f),
-                        radius = cancelRadius,
-                        center = center
-                    )
-                }
-
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.4f * menuAlpha),
-                    radius = cancelRadius,
-                    center = center,
-                    style = Stroke(width = 1.dp.toPx())
-                )
-
-                // Draw a small 'X' to indicate cancel
-                val xSize = 6.dp.toPx()
-                drawLine(
-                    color = Color.White.copy(alpha = 0.6f * menuAlpha),
-                    start = Offset(center.x - xSize, center.y - xSize),
-                    end = Offset(center.x + xSize, center.y + xSize),
-                    strokeWidth = 2.dp.toPx()
-                )
-                drawLine(
-                    color = Color.White.copy(alpha = 0.6f * menuAlpha),
-                    start = Offset(center.x + xSize, center.y - xSize),
-                    end = Offset(center.x - xSize, center.y + xSize),
-                    strokeWidth = 2.dp.toPx()
+                    selectedIndex = selectedIndex,
+                    alpha = menuAlpha
                 )
             }
         }
     }
 }
+
+private fun DrawScope.drawRadialMenu(
+    items: List<RadialMenuItem>,
+    center: Offset,
+    selectedIndex: Int?,
+    alpha: Float,
+) {
+    if (items.isEmpty()) {
+        return
+    }
+
+    val radius = MenuRadius.toPx()
+    val cancelRadius = CancelThreshold.toPx()
+    val bgPadding = MenuBackgroundPadding.toPx()
+
+    // 1. Background Dim
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.65f * alpha),
+        radius = radius + bgPadding,
+        center = center
+    )
+
+    // 2. Menu Items
+    val sliceAngle = 360f / items.size
+    items.forEachIndexed { index, item ->
+        val midAngle = index * sliceAngle - 90f
+        val isSelected = index == selectedIndex
+
+        if (isSelected) {
+            drawRadialItemHighlight(
+                center = center,
+                radius = radius,
+                cancelRadius = cancelRadius,
+                startAngle = midAngle - (sliceAngle / 2f),
+                sweepAngle = sliceAngle,
+                alpha = alpha
+            )
+        }
+
+        drawRadialItemLabel(
+            text = item.label,
+            center = center,
+            radius = cancelRadius + (radius - cancelRadius) * 0.55f,
+            angle = midAngle,
+            isSelected = isSelected,
+            alpha = alpha
+        )
+    }
+
+    // 3. Overlays
+    drawRadialMenuOverlays(
+        center = center,
+        radius = radius,
+        cancelRadius = cancelRadius,
+        isCancelSelected = selectedIndex == null,
+        alpha = alpha
+    )
+}
+
+private fun DrawScope.drawRadialItemHighlight(
+    center: Offset,
+    radius: Float,
+    cancelRadius: Float,
+    startAngle: Float,
+    sweepAngle: Float,
+    alpha: Float,
+) {
+    val strokeWidth = radius - cancelRadius
+    val arcPathRadius = cancelRadius + (strokeWidth / 2f)
+    drawArc(
+        color = Color.White.copy(alpha = 0.2f * alpha),
+        startAngle = startAngle,
+        sweepAngle = sweepAngle,
+        useCenter = false,
+        topLeft = Offset(center.x - arcPathRadius, center.y - arcPathRadius),
+        size = androidx.compose.ui.geometry.Size(arcPathRadius * 2, arcPathRadius * 2),
+        style = Stroke(width = strokeWidth)
+    )
+}
+
+private fun DrawScope.drawRadialItemLabel(
+    text: String,
+    center: Offset,
+    radius: Float,
+    angle: Float,
+    isSelected: Boolean,
+    alpha: Float,
+) {
+    val textColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f)
+
+    drawIntoCanvas { canvas ->
+        val paint = android.graphics.Paint().apply {
+            color = textColor.copy(alpha = textColor.alpha * alpha).toArgb()
+            textSize = (if (isSelected) 16.sp else 14.sp).toPx()
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.create(
+                android.graphics.Typeface.DEFAULT,
+                if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
+            )
+        }
+
+        val path = android.graphics.Path()
+        val isBottomHalf = angle > -10 && angle < 190
+
+        if (isBottomHalf) {
+            val bottomRadius = radius + paint.textSize
+            val rect = android.graphics.RectF(
+                center.x - bottomRadius,
+                center.y - bottomRadius,
+                center.x + bottomRadius,
+                center.y + bottomRadius
+            )
+            path.addArc(rect, angle + 90f, -180f)
+        } else {
+            val rect = android.graphics.RectF(
+                center.x - radius,
+                center.y - radius,
+                center.x + radius,
+                center.y + radius
+            )
+            path.addArc(rect, angle - 90f, 180f)
+        }
+        canvas.nativeCanvas.drawTextOnPath(text, path, 0f, 0f, paint)
+    }
+}
+
+private fun DrawScope.drawRadialMenuOverlays(
+    center: Offset,
+    radius: Float,
+    cancelRadius: Float,
+    isCancelSelected: Boolean,
+    alpha: Float,
+) {
+    // Outer border
+    drawCircle(
+        color = Color.White.copy(alpha = 0.3f * alpha),
+        radius = radius,
+        center = center,
+        style = Stroke(width = 2.dp.toPx())
+    )
+
+    // Cancel zone background
+    if (isCancelSelected) {
+        drawCircle(
+            color = Color.White.copy(alpha = 0.15f * alpha),
+            radius = cancelRadius,
+            center = center
+        )
+    }
+
+    // Cancel zone border
+    drawCircle(
+        color = Color.White.copy(alpha = 0.4f * alpha),
+        radius = cancelRadius,
+        center = center,
+        style = Stroke(width = 1.dp.toPx())
+    )
+
+    // Cancel 'X'
+    val xSize = 6.dp.toPx()
+    val xColor = Color.White.copy(alpha = 0.6f * alpha)
+    val xStroke = 2.dp.toPx()
+
+    drawLine(
+        color = xColor,
+        start = Offset(center.x - xSize, center.y - xSize),
+        end = Offset(center.x + xSize, center.y + xSize),
+        strokeWidth = xStroke
+    )
+    drawLine(
+        color = xColor,
+        start = Offset(center.x + xSize, center.y - xSize),
+        end = Offset(center.x - xSize, center.y + xSize),
+        strokeWidth = xStroke
+    )
+}
+
 
 private fun Modifier.twoPointerLongDrag(
     key: Any?,
@@ -266,7 +330,9 @@ private fun isValidLongPressEvent(
     currentEvent: PointerEvent,
     touchSlopSquared: Float
 ): Boolean =
-    currentEvent.changes.size == 2 && currentEvent.changes.all { it.pressed } && currentEvent.changes.all { change ->
+    currentEvent.changes.size == 2
+            && currentEvent.changes.all { it.pressed }
+            && currentEvent.changes.all { change ->
         val original = originalEvent.changes.find { it.id == change.id } ?: return@all false
         (original.position - change.position).getDistanceSquared() < touchSlopSquared
     }
