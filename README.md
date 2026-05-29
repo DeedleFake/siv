@@ -16,4 +16,4 @@ Usage
 
 Hold two fingers down for a moment to reveal the stealth radial menu. While holding, select an option by sliding your fingers and target using the midpoint between them, then release to activate your selection.
 
-https://github.com/user-attachments/assets/c6bcdfca-884e-48e6-87ea-eb10ed0edb49
+https://github.com/user-attachments/assets/f84f9cea-899f-4c59-92ef-78dfc98935fa
