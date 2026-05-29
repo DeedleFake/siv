@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,6 +29,10 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.PI
 import kotlin.math.atan2
 
+private val MenuRadius = 115.dp
+private val CancelThreshold = 30.dp
+private val MenuBackgroundPadding = 20.dp
+
 data class RadialMenuItem(
     val label: String,
     val onSelect: () -> Unit
@@ -37,16 +40,17 @@ data class RadialMenuItem(
 
 @Composable
 fun RadialMenu(
-    items: List<RadialMenuItem>,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    items: List<RadialMenuItem>,
+    content: @Composable () -> Unit,
 ) {
     var menuCenter by remember { mutableStateOf<Offset?>(null) }
-    var selectedIndex by remember { mutableIntStateOf(-1) }
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
 
+    val cancelThresholdPx = remember(density) { with(density) { CancelThreshold.toPx() } }
     val menuAlpha by animateFloatAsState(if (menuCenter != null) 1f else 0f, label = "Alpha")
 
     Box(
@@ -59,31 +63,21 @@ fun RadialMenu(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
                 onEnd = {
-                    if (selectedIndex != -1) {
-                        items[selectedIndex].onSelect()
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    }
+                    items.getOrNull(selectedIndex ?: -1)?.onSelect()
                     menuCenter = null
-                    selectedIndex = -1
+                    selectedIndex = null
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
                 onDrag = { event ->
-                    val menuCenter = menuCenter ?: return@twoPointerLongDrag
-                    val diff = event.centroid() - menuCenter
-                    val dist = diff.getDistance()
-
-                    if (dist > with(density) { 30.dp.toPx() }) {
-                        val angle = atan2(diff.y, diff.x) * 180 / PI
-                        val normalizedAngle = (angle + 90 + 360) % 360
-                        val sliceSize = 360f / items.size
-                        val newIndex =
-                            ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
-
-                        if (newIndex != selectedIndex && newIndex < items.size) {
-                            selectedIndex = newIndex
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
-                    } else {
-                        selectedIndex = -1
+                    val newIndex = calculateSelectedIndex(
+                        location = event.centroid(),
+                        menuCenter = menuCenter ?: return@twoPointerLongDrag,
+                        itemCount = items.size,
+                        cancelThreshold = cancelThresholdPx
+                    )
+                    if (newIndex != selectedIndex) {
+                        selectedIndex = newIndex
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     }
                 },
             )
@@ -93,12 +87,12 @@ fun RadialMenu(
         if (menuAlpha > 0f && menuCenter != null) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val center = menuCenter!!
-                val radius = 115.dp.toPx()
-                val cancelRadius = 30.dp.toPx()
+                val radius = MenuRadius.toPx()
+                val cancelRadius = CancelThreshold.toPx()
 
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.65f * menuAlpha),
-                    radius = radius + 20.dp.toPx(),
+                    radius = radius + MenuBackgroundPadding.toPx(),
                     center = center
                 )
 
@@ -152,12 +146,12 @@ fun RadialMenu(
                             center.y + textRadius
                         )
 
-                        // If the text is in the bottom half of the circle (0 to 180 degrees), 
+                        // If the text is in the bottom half of the circle (0 to 180 degrees),
                         // we need to reverse the arc so the text isn't upside down.
                         val isBottomHalf = midAngle > -10 && midAngle < 190
 
                         if (isBottomHalf) {
-                            // Bottom half: Path goes counter-clockwise, and we offset the radius 
+                            // Bottom half: Path goes counter-clockwise, and we offset the radius
                             // slightly so the text sits "on top" of the path instead of "hanging".
                             val bottomRect = android.graphics.RectF(
                                 center.x - (textRadius + paint.textSize),
@@ -183,7 +177,7 @@ fun RadialMenu(
                 )
 
                 // Draw central "Cancel" zone
-                val isCancelSelected = selectedIndex == -1
+                val isCancelSelected = selectedIndex == null
 
                 if (isCancelSelected) {
                     drawCircle(
@@ -296,3 +290,21 @@ private fun PointerEvent.centroid(): Offset =
         .map { it.position }
         .reduce { acc, offset -> acc + offset }
         .let { Offset(it.x / changes.size, it.y / changes.size) }
+
+private fun calculateSelectedIndex(
+    location: Offset,
+    menuCenter: Offset,
+    itemCount: Int,
+    cancelThreshold: Float
+): Int? {
+    val offset = location - menuCenter
+    if (offset.getDistance() < cancelThreshold) {
+        return null
+    }
+
+    val angle = atan2(offset.y, offset.x) * 180 / PI
+    val normalizedAngle = (angle + 90 + 360) % 360
+    val sliceSize = 360f / itemCount
+    return ((normalizedAngle + (sliceSize / 2)) % 360 / sliceSize).toInt()
+        .coerceIn(0, itemCount - 1)
+}
