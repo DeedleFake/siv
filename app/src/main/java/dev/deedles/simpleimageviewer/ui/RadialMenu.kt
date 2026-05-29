@@ -2,6 +2,7 @@ package dev.deedles.simpleimageviewer.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -19,7 +20,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -216,60 +216,60 @@ private fun Modifier.twoFingerLongPress(
     onMove: (Offset) -> Unit,
     onRelease: () -> Unit
 ): Modifier = pointerInput(key) {
-    awaitPointerEventScope {
-        while (true) {
-            // 1. Wait for exactly 2 fingers to go down
-            val initialEvent = awaitPointerEvent(PointerEventPass.Initial)
-            if (initialEvent.changes.size == 2) {
-                val centroid = Offset(
-                    initialEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
-                    initialEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
+    awaitEachGesture {
+        // 1. Wait for exactly 2 fingers to be present
+        var event = awaitPointerEvent(PointerEventPass.Initial)
+        while (event.changes.size < 2) {
+            event = awaitPointerEvent(PointerEventPass.Initial)
+        }
+
+        if (event.changes.size != 2) return@awaitEachGesture
+        val centroid = Offset(
+            event.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
+            event.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
+        )
+
+        // 2. Detect long press (timeout with movement threshold)
+        val longPressTriggered = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val nextEvent = awaitPointerEvent(PointerEventPass.Initial)
+                if (nextEvent.changes.size != 2) return@withTimeoutOrNull false
+                
+                val nextCentroid = Offset(
+                    nextEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / 2,
+                    nextEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / 2
                 )
-
-                // 2. Try to detect a long press (consistent 400ms timeout)
-                val isLongPress = withTimeoutOrNull(400) {
-                    while (true) {
-                        val moveEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        if (moveEvent.changes.size != 2) break
-
-                        val newCentroid = Offset(
-                            (moveEvent.changes[0].position.x + moveEvent.changes[1].position.x) / 2,
-                            (moveEvent.changes[0].position.y + moveEvent.changes[1].position.y) / 2
-                        )
-
-                        // If fingers move significantly, it's a zoom. Abort menu.
-                        if ((newCentroid - centroid).getDistance() > 15f) break
-                    }
-                    false
-                } ?: true // If timeout expires, it's a long press
-
-                if (isLongPress) {
-                    onLongPress(centroid)
-
-                    // 3. Menu active: Handle selection and consume all events
-                    while (true) {
-                        val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        dragEvent.changes.forEach { it.consume() }
-
-                        if (dragEvent.type == PointerEventType.Release || dragEvent.changes.isEmpty()) {
-                            onRelease()
-                            break
-                        }
-
-                        val currentTouch = Offset(
-                            dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
-                            dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
-                        )
-                        onMove(currentTouch)
-                    }
-                } else {
-                    // 4. Movement was detected: It's a zoom.
-                    // Wait for all fingers to lift before allowing menu again.
-                    while (true) {
-                        val releaseEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        if (releaseEvent.changes.none { it.pressed }) break
-                    }
+                if ((nextCentroid - centroid).getDistance() > viewConfiguration.touchSlop) {
+                    return@withTimeoutOrNull false
                 }
+            }
+        } == null
+
+        if (longPressTriggered) {
+            onLongPress(centroid)
+
+            // 3. Menu active: Handle selection and consume all events
+            while (true) {
+                val dragEvent = awaitPointerEvent(PointerEventPass.Initial)
+                dragEvent.changes.forEach { it.consume() }
+
+                if (dragEvent.changes.none { it.pressed }) {
+                    onRelease()
+                    break
+                }
+                
+                val currentCentroid = Offset(
+                    dragEvent.changes.sumOf { it.position.x.toDouble() }.toFloat() / dragEvent.changes.size,
+                    dragEvent.changes.sumOf { it.position.y.toDouble() }.toFloat() / dragEvent.changes.size
+                )
+                onMove(currentCentroid)
+            }
+        } else {
+            // 4. Movement was detected before long press: It's a zoom/pan.
+            // Wait for all fingers to lift before allowing menu again.
+            while (true) {
+                val nextEvent = awaitPointerEvent(PointerEventPass.Initial)
+                if (nextEvent.changes.none { it.pressed }) break
             }
         }
     }
