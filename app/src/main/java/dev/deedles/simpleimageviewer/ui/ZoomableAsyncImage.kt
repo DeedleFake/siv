@@ -29,6 +29,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.awxkee.jxlcoder.coil.AnimatedJxlDecoder
+import com.awxkee.jxlcoder.coil.JxlDecoder
 import kotlinx.coroutines.launch
 
 /**
@@ -60,6 +62,10 @@ fun ZoomableAsyncImage(
     val imageLoader = remember {
         ImageLoader.Builder(context)
             .crossfade(true)
+            .components {
+                add(JxlDecoder.Factory())
+                add(AnimatedJxlDecoder.Factory())
+            }
             .build()
     }
 

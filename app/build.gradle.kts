@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.coil.kt.network.okhttp)
     implementation(libs.coil.gif)
     implementation(libs.coil.svg)
+    implementation(libs.jxl.coder)
+    implementation(libs.jxl.coder.coil)
 
     // Testing
     testImplementation(libs.junit)

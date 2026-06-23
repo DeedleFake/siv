@@ -9,11 +9,14 @@ espressoCore = "3.7.0"
 activityCompose = "1.13.0"
 lifecycle = "2.10.0"
 coil = "3.4.0"
+jxl-coder = "2.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+jxl-coder = { group = "io.github.awxkee", name = "jxl-coder", version.ref = "jxl-coder" }
+jxl-coder-coil = { group = "io.github.awxkee", name = "jxl-coder-coil", version.ref = "jxl-coder" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
