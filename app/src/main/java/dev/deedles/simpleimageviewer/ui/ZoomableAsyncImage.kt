@@ -63,7 +63,6 @@ fun ZoomableAsyncImage(
         ImageLoader.Builder(context)
             .crossfade(true)
             .components {
-                add(JxlDecoder.Factory())
                 add(AnimatedJxlDecoder.Factory())
             }
             .build()
