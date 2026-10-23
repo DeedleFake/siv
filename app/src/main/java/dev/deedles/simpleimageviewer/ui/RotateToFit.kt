@@ -1,16 +1,9 @@
 package dev.deedles.simpleimageviewer.ui
 
-import android.content.Context
-import android.view.WindowManager
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
-import kotlin.math.min
 
 enum class Orientation {
     Portrait,
@@ -48,24 +41,3 @@ fun Modifier.rotateToFit(imageSize: Size?, enabled: Boolean): Modifier =
             }
         }
     }
-
-/** The platform's `WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP`: from this up, displays ignore orientation requests. */
-private const val LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP = 600
-
-/**
- * Whether the display ignores [android.app.Activity.setRequestedOrientation]. Android 16 and later
- * do so on displays at least [LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP] wide on the short side,
- * judged on the display and not the window, and expose no API that says so.
- */
-fun Context.ignoresOrientationRequests(): Boolean {
-    val metrics = getSystemService(WindowManager::class.java).maximumWindowMetrics
-    val bounds = metrics.bounds
-    return min(bounds.width(), bounds.height()) / metrics.density >= LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
-}
-
-@Composable
-fun rememberIgnoresOrientationRequests(): Boolean {
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    return remember(context, configuration) { context.ignoresOrientationRequests() }
-}

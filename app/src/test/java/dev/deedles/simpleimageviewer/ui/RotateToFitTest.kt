@@ -31,7 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// A large display at 1 px per dp, tall enough to hold the window in either orientation.
+// A display at 1 px per dp, big enough to hold the window in either orientation.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w1280dp-h1280dp-mdpi")
 class RotateToFitTest {
@@ -46,15 +46,14 @@ class RotateToFitTest {
     private var imageSize by mutableStateOf<Size?>(portraitImage)
     private var autoRotate by mutableStateOf(true)
 
-    private fun show(requireLargeDisplay: Boolean = false) {
+    private fun show() {
         rule.setContent {
-            val large = rememberIgnoresOrientationRequests()
             Box(Modifier.size(windowWidth.dp, windowHeight.dp)) {
                 ZoomableAsyncImage(
                     uri = Uri.EMPTY,
                     onImageSizeDetermined = { _, _ -> },
                     modifier = Modifier
-                        .rotateToFit(imageSize, enabled = autoRotate && (large || !requireLargeDisplay))
+                        .rotateToFit(imageSize, enabled = autoRotate)
                         .fillMaxSize()
                 )
             }
@@ -164,21 +163,6 @@ class RotateToFitTest {
     }
 
     @Test
-    @Config(sdk = [36], qualifiers = "w411dp-h891dp-mdpi")
-    fun phoneDisplayIsNotRotatedEvenWhenTheWindowIsLandscape() {
-        windowWidth = 400
-        windowHeight = 300
-        show(requireLargeDisplay = true)
-        assertNotRotated()
-    }
-
-    @Test
-    fun tabletDisplayIsRotated() {
-        show(requireLargeDisplay = true)
-        assertRotated()
-    }
-
-    @Test
     fun rotationIsClockwiseSoTheContentsTopFacesTheRightEdge() {
         rule.setContent {
             Box(Modifier.size(1280.dp, 800.dp)) {
@@ -197,6 +181,7 @@ class RotateToFitTest {
     @Test
     fun doubleTapZoomsTowardsTheTappedPointInScreenDirections() {
         show()
+        assertRotated()
         val center = Offset(640f, 400f)
         val tap = Offset(1180f, 100f)
         rule.onRoot().performTouchInput { click(tap) ; advanceEventTime(100); click(tap) }
@@ -213,6 +198,7 @@ class RotateToFitTest {
     @Test
     fun dragPansInTheDirectionOfTheFinger() {
         show()
+        assertRotated()
         val middle = Offset(640f, 400f)
         rule.onRoot().performTouchInput { click(middle); advanceEventTime(100); click(middle) }
         settle()
