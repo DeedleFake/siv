@@ -55,9 +55,9 @@ class RotateToFitDecisionTest {
     fun turnsTowardTheNaturalTopEdgeForEveryCombination() {
         val expected = mapOf(
             DisplayRotation.Rotation0 to Turn.Clockwise,
-            DisplayRotation.Rotation90 to Turn.CounterClockwise,
+            DisplayRotation.Rotation90 to Turn.Clockwise,
             DisplayRotation.Rotation180 to Turn.Clockwise,
-            DisplayRotation.Rotation270 to Turn.Clockwise,
+            DisplayRotation.Rotation270 to Turn.CounterClockwise,
         )
         for ((rotation, want) in expected) {
             assertEquals(rotation.name, want, turn(Orientation.Portrait, Orientation.Landscape, rotation))

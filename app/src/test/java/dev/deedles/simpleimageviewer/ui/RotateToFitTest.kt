@@ -163,10 +163,10 @@ class RotateToFitTest {
         assertRotated()
     }
 
-    // The expectations below follow the Display.getRotation documentation: ROTATION_90 means the drawn
-    // graphics are rotated 90 degrees clockwise from the natural orientation, so the window's left edge is
-    // the device's natural top edge, and ROTATION_270 puts the natural top edge on the window's right.
-    // That convention is from the docs; it has not been checked on a device.
+    // The expectations below follow what a Pixel Tablet locked in portrait showed with the physical top
+    // edge on the window's left: ROTATION_270 needs the counter-clockwise turn and ROTATION_90 the
+    // clockwise one. That is the opposite of the Display.getRotation documentation, so the convention
+    // was set from that device test, not from the documentation.
 
     /** Where the content's top-left and top-right corner markers end up in a window of the given size. */
     private fun markers(
@@ -211,13 +211,13 @@ class RotateToFitTest {
     }
 
     @Test
-    fun rotation90TurnsCounterClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheLeft() {
-        assertTurnedCounterClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation90), 800, 1280)
+    fun rotation270TurnsCounterClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheLeft() {
+        assertTurnedCounterClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation270), 800, 1280)
     }
 
     @Test
-    fun rotation90TurnsPortraitContentInALandscapeWindowCounterClockwise() {
-        assertTurnedCounterClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation90), 1280, 800)
+    fun rotation270TurnsPortraitContentInALandscapeWindowCounterClockwise() {
+        assertTurnedCounterClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation270), 1280, 800)
     }
 
     @Test
@@ -226,8 +226,8 @@ class RotateToFitTest {
     }
 
     @Test
-    fun rotation270TurnsClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheRight() {
-        assertTurnedClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation270), 800, 1280)
+    fun rotation90TurnsClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheRight() {
+        assertTurnedClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation90), 800, 1280)
     }
 
     @Test
@@ -243,13 +243,13 @@ class RotateToFitTest {
         fun markers() = rule.onNodeWithTag("topStart").fetchSemanticsNode().boundsInRoot.center to
             rule.onNodeWithTag("topEnd").fetchSemanticsNode().boundsInRoot.center
         assertTurnedClockwise(markers(), 800, 1280)
-        change { displayRotation = DisplayRotation.Rotation90 }
+        change { displayRotation = DisplayRotation.Rotation270 }
         assertTurnedCounterClockwise(markers(), 800, 1280)
         change { displayRotation = DisplayRotation.Rotation180 }
         assertTurnedClockwise(markers(), 800, 1280)
-        change { displayRotation = DisplayRotation.Rotation270 }
-        assertTurnedClockwise(markers(), 800, 1280)
         change { displayRotation = DisplayRotation.Rotation90 }
+        assertTurnedClockwise(markers(), 800, 1280)
+        change { displayRotation = DisplayRotation.Rotation270 }
         assertTurnedCounterClockwise(markers(), 800, 1280)
     }
 
@@ -258,7 +258,7 @@ class RotateToFitTest {
 
     @Test
     fun doubleTapZoomsTowardsTheTappedPointWhenTurnedCounterClockwise() {
-        displayRotation = DisplayRotation.Rotation90
+        displayRotation = DisplayRotation.Rotation270
         doubleTapZooms()
     }
 
@@ -283,7 +283,7 @@ class RotateToFitTest {
 
     @Test
     fun dragPansInTheDirectionOfTheFingerWhenTurnedCounterClockwise() {
-        displayRotation = DisplayRotation.Rotation90
+        displayRotation = DisplayRotation.Rotation270
         dragPans()
     }
 
