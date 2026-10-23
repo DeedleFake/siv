@@ -17,12 +17,29 @@ import androidx.compose.ui.unit.Constraints
 
 enum class Orientation {
     Portrait,
-    Landscape;
+    Landscape,
+    Square;
+
+    /** The orientation that fills a window of this one's shape when turned a quarter turn, or null for [Square]. */
+    val opposite: Orientation?
+        get() = when (this) {
+            Portrait -> Landscape
+            Landscape -> Portrait
+            Square -> null
+        }
 
     companion object {
-        fun of(width: Int, height: Int) = if (width > height) Landscape else Portrait
+        fun of(width: Int, height: Int) = when {
+            width > height -> Landscape
+            width < height -> Portrait
+            else -> Square
+        }
 
-        fun of(size: Size) = if (size.width > size.height) Landscape else Portrait
+        fun of(size: Size) = when {
+            size.width > size.height -> Landscape
+            size.width < size.height -> Portrait
+            else -> Square
+        }
     }
 }
 
@@ -52,18 +69,22 @@ enum class Turn(val degrees: Float) {
     CounterClockwise(-90f),
 }
 
-/** Whether content should be turned a quarter turn so an image of [image] orientation fills a [window]. */
+/**
+ * Whether content should be turned a quarter turn so an image of [image] orientation fills a [window].
+ * A square image fits any window equally well, and a square window fits any image equally well, so
+ * neither is ever turned.
+ */
 fun shouldRotateToFit(image: Orientation?, window: Orientation, enabled: Boolean) =
-    enabled && image != null && image != window
+    enabled && image != null && image.opposite == window
 
 /**
  * The orientation the display has at [DisplayRotation.Rotation0]. A window that is portrait at
  * rotation 0 or 180 means the display is naturally portrait, and so does one that is landscape at
- * rotation 90 or 270.
+ * rotation 90 or 270. A square window says nothing, so it gives [Orientation.Square].
  */
 fun naturalOrientation(window: Orientation, displayRotation: DisplayRotation): Orientation {
     val upright = displayRotation == DisplayRotation.Rotation0 || displayRotation == DisplayRotation.Rotation180
-    return if ((window == Orientation.Portrait) == upright) Orientation.Portrait else Orientation.Landscape
+    return if (upright) window else window.opposite ?: window
 }
 
 /**

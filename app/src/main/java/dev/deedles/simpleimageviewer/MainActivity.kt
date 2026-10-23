@@ -67,19 +67,22 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Requests the best screen orientation for the given image dimensions.
-     * Landscape photos → landscape, portrait photos → portrait.
      * Passing (0, 0) resets to system default.
      */
     private fun setOptimalOrientation(imageWidth: Int, imageHeight: Int) {
-        val desired = if (imageWidth <= 0 || imageHeight <= 0) {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        } else when (Orientation.of(imageWidth, imageHeight)) {
-            Orientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            Orientation.Portrait -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-        }
+        val desired = optimalOrientationRequest(imageWidth, imageHeight)
 
         if (requestedOrientation != desired) {
             requestedOrientation = desired
         }
     }
 }
+
+/** Landscape photos → landscape, portrait and square photos → portrait, no photo → system default. */
+internal fun optimalOrientationRequest(imageWidth: Int, imageHeight: Int) =
+    if (imageWidth <= 0 || imageHeight <= 0) {
+        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    } else when (Orientation.of(imageWidth, imageHeight)) {
+        Orientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        Orientation.Portrait, Orientation.Square -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+    }

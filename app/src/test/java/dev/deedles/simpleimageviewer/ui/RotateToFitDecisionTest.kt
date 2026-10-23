@@ -11,10 +11,13 @@ import org.junit.Test
 
 class RotateToFitDecisionTest {
     private val all = Orientation.entries
+    private val shaped = listOf(Orientation.Portrait, Orientation.Landscape)
+
+    private fun Orientation.other() = checkNotNull(opposite)
 
     @Test
     fun rotatesOnlyWhenEnabledAndOrientationsDiffer() {
-        for (image in all) for (window in all) {
+        for (image in shaped) for (window in shaped) {
             assertEquals(image != window, shouldRotateToFit(image, window, enabled = true))
             assertFalse(shouldRotateToFit(image, window, enabled = false))
         }
@@ -29,9 +32,10 @@ class RotateToFitDecisionTest {
     fun landscapeOnlyWhenWiderThanTall() {
         assertEquals(Orientation.Landscape, Orientation.of(1600, 900))
         assertEquals(Orientation.Portrait, Orientation.of(900, 1600))
-        assertEquals(Orientation.Portrait, Orientation.of(1000, 1000))
+        assertEquals(Orientation.Square, Orientation.of(1000, 1000))
         assertEquals(Orientation.Landscape, Orientation.of(Size(1600f, 900f)))
-        assertEquals(Orientation.Portrait, Orientation.of(Size(1000f, 1000f)))
+        assertEquals(Orientation.Portrait, Orientation.of(Size(900f, 1600f)))
+        assertEquals(Orientation.Square, Orientation.of(Size(1000f, 1000f)))
     }
 
     @Test
@@ -58,13 +62,13 @@ class RotateToFitDecisionTest {
         if (rotation == DisplayRotation.Rotation0 || rotation == DisplayRotation.Rotation180) {
             natural
         } else {
-            all.first { it != natural }
+            natural.other()
         }
 
     private fun assertTurns(natural: Orientation, expected: Map<DisplayRotation, Turn>) {
         for (rotation in DisplayRotation.entries) {
             val window = windowAt(natural, rotation)
-            val image = all.first { it != window }
+            val image = window.other()
             val label = "natural $natural, $rotation"
             assertEquals(label, expected.getValue(rotation), turn(image, window, rotation))
         }
@@ -72,7 +76,7 @@ class RotateToFitDecisionTest {
 
     @Test
     fun naturalOrientationFollowsTheWindowAndTheRotation() {
-        for (natural in all) for (rotation in DisplayRotation.entries) {
+        for (natural in shaped) for (rotation in DisplayRotation.entries) {
             assertEquals(natural, naturalOrientation(windowAt(natural, rotation), rotation))
         }
     }
@@ -108,10 +112,43 @@ class RotateToFitDecisionTest {
         )
     }
 
+    // A square image fits any window equally well, and a square window fits any image equally well.
+    @Test
+    fun squareImageIsNeverTurned() {
+        for (rotation in DisplayRotation.entries) for (window in all) {
+            assertFalse(shouldRotateToFit(Orientation.Square, window, enabled = true))
+            assertNull("$window, $rotation", turn(Orientation.Square, window, rotation))
+        }
+    }
+
+    @Test
+    fun squareWindowTurnsNoImage() {
+        for (rotation in DisplayRotation.entries) for (image in all) {
+            assertFalse(shouldRotateToFit(image, Orientation.Square, enabled = true))
+            assertNull("$image, $rotation", turn(image, Orientation.Square, rotation))
+        }
+    }
+
+    // The same holds on a display that is naturally either way: a square image in the window of
+    // every natural orientation and display rotation is not turned.
+    @Test
+    fun squareImageIsNeverTurnedOnAnyNaturalOrientation() {
+        for (natural in shaped) for (rotation in DisplayRotation.entries) {
+            assertNull("natural $natural, $rotation", turn(Orientation.Square, windowAt(natural, rotation), rotation))
+        }
+    }
+
+    @Test
+    fun aSquareWindowHasNoNaturalOrientation() {
+        for (rotation in DisplayRotation.entries) {
+            assertEquals(Orientation.Square, naturalOrientation(Orientation.Square, rotation))
+        }
+    }
+
     @Test
     fun theTurnIsNeverNullWhenTheOrientationsDiffer() {
-        for (rotation in DisplayRotation.entries) for (window in all) {
-            assertNotNull(turn(all.first { it != window }, window, rotation))
+        for (rotation in DisplayRotation.entries) for (window in shaped) {
+            assertNotNull(turn(window.other(), window, rotation))
         }
     }
 

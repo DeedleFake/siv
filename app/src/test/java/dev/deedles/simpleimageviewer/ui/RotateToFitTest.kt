@@ -122,6 +122,30 @@ class RotateToFitTest {
     }
 
     @Test
+    fun squareImageInLandscapeWindowIsNotRotated() {
+        imageSize = Size(1000f, 1000f)
+        show()
+        assertNotRotated()
+    }
+
+    @Test
+    fun squareImageInPortraitWindowIsNotRotated() {
+        windowWidth = 800
+        windowHeight = 1280
+        imageSize = Size(1000f, 1000f)
+        show()
+        assertNotRotated()
+    }
+
+    @Test
+    fun imageInSquareWindowIsNotRotated() {
+        windowWidth = 1000
+        windowHeight = 1000
+        show()
+        assertNotRotated()
+    }
+
+    @Test
     fun unknownImageSizeIsNotRotated() {
         imageSize = null
         show()
@@ -221,6 +245,13 @@ class RotateToFitTest {
     @Test
     fun landscapeWindowAtRotation270TurnsPortraitContentClockwiseSoItsTopFacesTheNaturalTopEdgeOnTheRight() {
         assertTurnedClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation270), 1280, 800)
+    }
+
+    @Test
+    fun squareImageInLandscapeWindowKeepsItsMarkersUnrotated() {
+        val (topStart, topEnd) = markers(Size(1000f, 1000f), 1280, 800, DisplayRotation.Rotation0)
+        assertEquals(Offset(5f, 5f), topStart)
+        assertEquals(Offset(1280 - 5f, 5f), topEnd)
     }
 
     // Naturally landscape display, with the direction from the Display.getRotation documentation.
