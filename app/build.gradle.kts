@@ -42,6 +42,14 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric's SDK 36 shadows need this JDK internal package.
+            it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+        }
+    }
 }
 
 kotlin {
@@ -71,6 +79,9 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 

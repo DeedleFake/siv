@@ -1,11 +1,14 @@
 package dev.deedles.simpleimageviewer.ui
 
 import android.net.Uri
+import android.view.ViewConfiguration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -19,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -49,6 +53,9 @@ fun ZoomableAsyncImage(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val doubleTapSlop = remember(context) {
+        ViewConfiguration.get(context).scaledDoubleTapSlop.toFloat()
+    }
 
     // Zoom state - mutable states for high-performance gesture tracking
     var scale by remember { mutableFloatStateOf(1f) }
@@ -102,8 +109,9 @@ fun ZoomableAsyncImage(
                     offsetY = clamped.y
                 }
             }
-            .pointerInput(uri) {
-                detectTapGestures(
+            .pointerInput(uri, doubleTapSlop) {
+                detectDoubleTap(
+                    doubleTapSlop = doubleTapSlop,
                     onDoubleTap = { tapOffset ->
                         scope.launch {
                             val targetScale = if (scale > 1.15f) 1f else 3f
@@ -157,6 +165,48 @@ fun ZoomableAsyncImage(
                 }
             }
         )
+    }
+}
+
+/**
+ * Calls [onDoubleTap] with the position of the second tap when two taps land within [doubleTapSlop]
+ * pixels of each other and within the platform's double-tap time window, like
+ * [android.view.GestureDetector]. A second tap that lands too far away or too late is treated as
+ * the first tap of a new double tap instead. A press held for the long-press timeout is not a tap,
+ * so a second tap held that long cancels the double tap instead of zooming when released.
+ */
+private suspend fun PointerInputScope.detectDoubleTap(
+    doubleTapSlop: Float,
+    onDoubleTap: (Offset) -> Unit
+) {
+    var previousDownPosition: Offset? = null
+    var previousUpTime = 0L
+
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        down.consume()
+
+        val firstDownPosition = previousDownPosition
+        previousDownPosition = null
+
+        // Movement past the touch slop, another gesture taking over, or a press held as long as a
+        // long press means this isn't a tap.
+        val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            waitForUpOrCancellation()
+        } ?: return@awaitEachGesture
+        up.consume()
+
+        val elapsed = down.uptimeMillis - previousUpTime
+        val isDoubleTap = firstDownPosition != null &&
+            elapsed in viewConfiguration.doubleTapMinTimeMillis..viewConfiguration.doubleTapTimeoutMillis &&
+            (down.position - firstDownPosition).getDistanceSquared() < doubleTapSlop * doubleTapSlop
+
+        if (isDoubleTap) {
+            onDoubleTap(up.position)
+        } else {
+            previousDownPosition = down.position
+            previousUpTime = up.uptimeMillis
+        }
     }
 }
 
