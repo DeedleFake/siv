@@ -26,7 +26,10 @@ enum class Orientation {
     }
 }
 
-/** The display rotation as `Display.getRotation` reports it. */
+/**
+ * How far the system has turned the drawn graphics clockwise from the device's natural orientation.
+ * This is the opposite of how the device was physically turned.
+ */
 enum class DisplayRotation(val degrees: Int) {
     Rotation0(0),
     Rotation90(90),
@@ -54,11 +57,9 @@ fun shouldRotateToFit(image: Orientation?, window: Orientation, enabled: Boolean
     enabled && image != null && image != window
 
 /**
- * The turn that puts the content's top toward the edge that is the device's natural top, or null when
- * no turn is needed. Rotating clockwise wins ties. The display rotation is read the way a Pixel Tablet
- * reports it, where [DisplayRotation.Rotation90] is the one that favors a clockwise turn, which is
- * the opposite of what the `Display.getRotation` documentation suggests. That was only checked on
- * that device.
+ * The turn that leaves the content closest to upright relative to the device's natural orientation,
+ * or null when no turn is needed. The turn is a quarter turn either way, so the content is a quarter
+ * or three quarters from natural. Rotating clockwise wins ties.
  */
 fun rotateToFitTurn(
     image: Orientation?,
@@ -68,7 +69,7 @@ fun rotateToFitTurn(
 ): Turn? {
     if (!shouldRotateToFit(image, window, enabled)) return null
     val offNatural = { turn: Turn ->
-        val degrees = Math.floorMod(turn.degrees.toInt() - displayRotation.degrees, 360)
+        val degrees = Math.floorMod(turn.degrees.toInt() + displayRotation.degrees, 360)
         minOf(degrees, 360 - degrees)
     }
     return Turn.entries.minBy(offNatural)
