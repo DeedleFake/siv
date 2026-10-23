@@ -88,4 +88,22 @@ class ZoomableAsyncImageTest {
         tap(listOf(far + Offset(10f, 10f)))
         assertTrue(zoom() > before * 2f)
     }
+
+    @Test
+    fun heldSecondTapDoesNotZoom() {
+        show()
+        val before = zoom()
+        val position = Offset(100f, 100f)
+        rule.onRoot().performTouchInput {
+            click(position)
+            advanceEventTime(100)
+            down(position)
+        }
+        rule.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() * 3L)
+        rule.onRoot().performTouchInput {
+            advanceEventTime(ViewConfiguration.getLongPressTimeout() * 3L)
+            up()
+        }
+        assertEquals(before, zoom(), 0.5f)
+    }
 }

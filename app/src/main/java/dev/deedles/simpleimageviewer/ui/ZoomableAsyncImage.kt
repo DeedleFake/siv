@@ -172,7 +172,8 @@ fun ZoomableAsyncImage(
  * Calls [onDoubleTap] with the position of the second tap when two taps land within [doubleTapSlop]
  * pixels of each other and within the platform's double-tap time window, like
  * [android.view.GestureDetector]. A second tap that lands too far away or too late is treated as
- * the first tap of a new double tap instead.
+ * the first tap of a new double tap instead. A press held for the long-press timeout is not a tap,
+ * so a second tap held that long cancels the double tap instead of zooming when released.
  */
 private suspend fun PointerInputScope.detectDoubleTap(
     doubleTapSlop: Float,
@@ -188,8 +189,11 @@ private suspend fun PointerInputScope.detectDoubleTap(
         val firstDownPosition = previousDownPosition
         previousDownPosition = null
 
-        // Movement past the touch slop, or another gesture taking over, means this isn't a tap.
-        val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+        // Movement past the touch slop, another gesture taking over, or a press held as long as a
+        // long press means this isn't a tap.
+        val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            waitForUpOrCancellation()
+        } ?: return@awaitEachGesture
         up.consume()
 
         val elapsed = down.uptimeMillis - previousUpTime
