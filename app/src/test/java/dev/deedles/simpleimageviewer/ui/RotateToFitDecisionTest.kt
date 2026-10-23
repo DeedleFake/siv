@@ -4,6 +4,7 @@ import android.view.Surface
 import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,24 +52,78 @@ class RotateToFitDecisionTest {
         }
     }
 
-    @Test
-    fun turnsTowardTheNaturalTopEdgeForEveryCombination() {
-        val expected = mapOf(
-            DisplayRotation.Rotation0 to Turn.Clockwise,
-            DisplayRotation.Rotation90 to Turn.CounterClockwise,
-            DisplayRotation.Rotation180 to Turn.Clockwise,
-            DisplayRotation.Rotation270 to Turn.Clockwise,
-        )
-        for ((rotation, want) in expected) {
-            assertEquals(rotation.name, want, turn(Orientation.Portrait, Orientation.Landscape, rotation))
-            assertEquals(rotation.name, want, turn(Orientation.Landscape, Orientation.Portrait, rotation))
+    // The window orientation the display has at a rotation, given its natural orientation: the natural one
+    // at 0 and 180 degrees, the other one at 90 and 270.
+    private fun windowAt(natural: Orientation, rotation: DisplayRotation) =
+        if (rotation == DisplayRotation.Rotation0 || rotation == DisplayRotation.Rotation180) {
+            natural
+        } else {
+            all.first { it != natural }
+        }
+
+    private fun assertTurns(natural: Orientation, expected: Map<DisplayRotation, Turn>) {
+        for (rotation in DisplayRotation.entries) {
+            val window = windowAt(natural, rotation)
+            val image = all.first { it != window }
+            val label = "natural $natural, $rotation"
+            assertEquals(label, expected.getValue(rotation), turn(image, window, rotation))
         }
     }
 
     @Test
+    fun naturalOrientationFollowsTheWindowAndTheRotation() {
+        for (natural in all) for (rotation in DisplayRotation.entries) {
+            assertEquals(natural, naturalOrientation(windowAt(natural, rotation), rotation))
+        }
+    }
+
+    // A naturally landscape display: the content's top goes toward the natural top edge, using the
+    // direction in the Display.getRotation documentation. Not checked on a device.
+    @Test
+    fun naturallyLandscapeDisplayTurnsTowardTheNaturalTopEdge() {
+        assertTurns(
+            Orientation.Landscape,
+            mapOf(
+                DisplayRotation.Rotation0 to Turn.Clockwise,
+                DisplayRotation.Rotation90 to Turn.CounterClockwise,
+                DisplayRotation.Rotation180 to Turn.Clockwise,
+                DisplayRotation.Rotation270 to Turn.Clockwise,
+            ),
+        )
+    }
+
+    // A naturally portrait display, like the Pixel Tablet as Android reports it: the content's top goes
+    // toward the natural left edge. At rotation 0 that was checked on a Pixel Tablet held in portrait
+    // with its physical top on the window's left.
+    @Test
+    fun naturallyPortraitDisplayTurnsTowardTheNaturalLeftEdge() {
+        assertTurns(
+            Orientation.Portrait,
+            mapOf(
+                DisplayRotation.Rotation0 to Turn.CounterClockwise,
+                DisplayRotation.Rotation90 to Turn.Clockwise,
+                DisplayRotation.Rotation180 to Turn.Clockwise,
+                DisplayRotation.Rotation270 to Turn.Clockwise,
+            ),
+        )
+    }
+
+    @Test
+    fun theTurnIsNeverNullWhenTheOrientationsDiffer() {
+        for (rotation in DisplayRotation.entries) for (window in all) {
+            assertNotNull(turn(all.first { it != window }, window, rotation))
+        }
+    }
+
+    // Both turns are equally close to the target edge in these cases, and clockwise wins.
+    @Test
     fun ties() {
-        assertEquals(Turn.Clockwise, turn(Orientation.Landscape, Orientation.Portrait, DisplayRotation.Rotation0))
-        assertEquals(Turn.Clockwise, turn(Orientation.Landscape, Orientation.Portrait, DisplayRotation.Rotation180))
+        for (rotation in listOf(DisplayRotation.Rotation0, DisplayRotation.Rotation180)) {
+            assertEquals(Turn.Clockwise, turn(Orientation.Portrait, Orientation.Landscape, rotation))
+        }
+        for (rotation in listOf(DisplayRotation.Rotation90, DisplayRotation.Rotation270)) {
+            assertEquals(Turn.Clockwise, turn(Orientation.Portrait, Orientation.Landscape, rotation))
+        }
     }
 
     @Test

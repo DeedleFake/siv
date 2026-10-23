@@ -57,9 +57,30 @@ fun shouldRotateToFit(image: Orientation?, window: Orientation, enabled: Boolean
     enabled && image != null && image != window
 
 /**
- * The turn that leaves the content closest to upright relative to the device's natural orientation,
- * or null when no turn is needed. The turn is a quarter turn either way, so the content is a quarter
- * or three quarters from natural. Rotating clockwise wins ties.
+ * The orientation the display has at [DisplayRotation.Rotation0]. A window that is portrait at
+ * rotation 0 or 180 means the display is naturally portrait, and so does one that is landscape at
+ * rotation 90 or 270.
+ */
+fun naturalOrientation(window: Orientation, displayRotation: DisplayRotation): Orientation {
+    val upright = displayRotation == DisplayRotation.Rotation0 || displayRotation == DisplayRotation.Rotation180
+    return if ((window == Orientation.Portrait) == upright) Orientation.Portrait else Orientation.Landscape
+}
+
+/**
+ * The turn that puts the content's top toward the edge of the screen that is the device's physical
+ * top when the device is held in its natural orientation, or null when no turn is needed. Rotating
+ * clockwise wins ties.
+ *
+ * That edge is the natural top edge on a display that is naturally landscape. A display that Android
+ * reports as naturally portrait is a landscape-first tablet held upright, such as the Pixel Tablet, so
+ * its physical top is the natural left edge. The natural orientation is worked out from [window] and
+ * [displayRotation] (see [naturalOrientation]).
+ *
+ * The direction of [displayRotation] follows the `Display.getRotation` documentation, where
+ * [DisplayRotation.Rotation90] means the drawn graphics are turned clockwise from natural. It has
+ * been checked on a device only for the Pixel Tablet's portrait hold. That is a naturally portrait
+ * display, where the result does not depend on the direction, so the direction itself has not been
+ * checked on any device. It only matters on naturally landscape displays.
  */
 fun rotateToFitTurn(
     image: Orientation?,
@@ -68,11 +89,12 @@ fun rotateToFitTurn(
     displayRotation: DisplayRotation,
 ): Turn? {
     if (!shouldRotateToFit(image, window, enabled)) return null
-    val offNatural = { turn: Turn ->
-        val degrees = Math.floorMod(turn.degrees.toInt() + displayRotation.degrees, 360)
+    val naturalLeftIsTop = if (naturalOrientation(window, displayRotation) == Orientation.Portrait) 90 else 0
+    val offTarget = { turn: Turn ->
+        val degrees = Math.floorMod(turn.degrees.toInt() + displayRotation.degrees + naturalLeftIsTop, 360)
         minOf(degrees, 360 - degrees)
     }
-    return Turn.entries.minBy(offNatural)
+    return Turn.entries.minBy(offTarget)
 }
 
 /**
