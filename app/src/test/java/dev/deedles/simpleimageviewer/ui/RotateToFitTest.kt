@@ -165,10 +165,9 @@ class RotateToFitTest {
 
     // Where the content's top goes depends on the display's natural orientation, which comes from the
     // window and the display rotation: a portrait window at rotation 0 or 180, or a landscape one at 90
-    // or 270, is a naturally portrait display, whose physical top is its natural left edge. The Pixel
-    // Tablet in its locked portrait hold is that case at rotation 0, and was checked on the device. The
-    // direction the Display.getRotation documentation gives for rotations 90 and 270 has not been
-    // checked on any device.
+    // or 270, is a naturally portrait display, whose physical top is its natural left edge. Rotations 0,
+    // 90 and 270 were checked on a Pixel Tablet, which is that case. The direction the
+    // Display.getRotation documentation gives has not been checked on a naturally landscape display.
 
     /** Where the content's top-left and top-right corner markers end up in a window of the given size. */
     private fun markers(
@@ -215,12 +214,12 @@ class RotateToFitTest {
     }
 
     @Test
-    fun landscapeWindowAtRotation90TurnsPortraitContentClockwise() {
-        assertTurnedClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation90), 1280, 800)
+    fun landscapeWindowAtRotation90TurnsPortraitContentCounterClockwiseSoItsTopFacesTheNaturalTopEdgeOnTheLeft() {
+        assertTurnedCounterClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation90), 1280, 800)
     }
 
     @Test
-    fun landscapeWindowAtRotation270TurnsPortraitContentClockwise() {
+    fun landscapeWindowAtRotation270TurnsPortraitContentClockwiseSoItsTopFacesTheNaturalTopEdgeOnTheRight() {
         assertTurnedClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation270), 1280, 800)
     }
 

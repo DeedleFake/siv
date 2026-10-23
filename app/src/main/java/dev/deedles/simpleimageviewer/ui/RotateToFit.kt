@@ -68,19 +68,21 @@ fun naturalOrientation(window: Orientation, displayRotation: DisplayRotation): O
 
 /**
  * The turn that puts the content's top toward the edge of the screen that is the device's physical
- * top when the device is held in its natural orientation, or null when no turn is needed. Rotating
- * clockwise wins ties.
+ * top, or null when no turn is needed.
  *
- * That edge is the natural top edge on a display that is naturally landscape. A display that Android
+ * On a display that is naturally landscape that edge is the natural top edge. A display that Android
  * reports as naturally portrait is a landscape-first tablet held upright, such as the Pixel Tablet, so
  * its physical top is the natural left edge. The natural orientation is worked out from [window] and
  * [displayRotation] (see [naturalOrientation]).
  *
+ * When both turns are equally close to that edge, a naturally portrait display picks the turn that
+ * puts the content's top toward the natural top edge, and a naturally landscape display picks
+ * clockwise.
+ *
  * The direction of [displayRotation] follows the `Display.getRotation` documentation, where
- * [DisplayRotation.Rotation90] means the drawn graphics are turned clockwise from natural. It has
- * been checked on a device only for the Pixel Tablet's portrait hold. That is a naturally portrait
- * display, where the result does not depend on the direction, so the direction itself has not been
- * checked on any device. It only matters on naturally landscape displays.
+ * [DisplayRotation.Rotation90] means the drawn graphics are turned clockwise from natural, so the
+ * natural top edge is the window's left edge. A Pixel Tablet, a naturally portrait display, confirmed
+ * that. The direction has not been checked on a naturally landscape display.
  */
 fun rotateToFitTurn(
     image: Orientation?,
@@ -90,11 +92,16 @@ fun rotateToFitTurn(
 ): Turn? {
     if (!shouldRotateToFit(image, window, enabled)) return null
     val naturalLeftIsTop = if (naturalOrientation(window, displayRotation) == Orientation.Portrait) 90 else 0
+    // How many degrees the content's top ends up from the natural top edge, or from the target edge.
+    val offNaturalTop = { turn: Turn ->
+        val degrees = Math.floorMod(turn.degrees.toInt() + displayRotation.degrees, 360)
+        minOf(degrees, 360 - degrees)
+    }
     val offTarget = { turn: Turn ->
         val degrees = Math.floorMod(turn.degrees.toInt() + displayRotation.degrees + naturalLeftIsTop, 360)
         minOf(degrees, 360 - degrees)
     }
-    return Turn.entries.minBy(offTarget)
+    return Turn.entries.minWith(compareBy(offTarget).thenBy(offNaturalTop))
 }
 
 /**

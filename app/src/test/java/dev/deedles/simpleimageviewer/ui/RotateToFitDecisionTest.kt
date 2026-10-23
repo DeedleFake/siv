@@ -93,15 +93,15 @@ class RotateToFitDecisionTest {
     }
 
     // A naturally portrait display, like the Pixel Tablet as Android reports it: the content's top goes
-    // toward the natural left edge. At rotation 0 that was checked on a Pixel Tablet held in portrait
-    // with its physical top on the window's left.
+    // toward the natural left edge, and toward the natural top edge when both turns are equally close.
+    // Rotations 0, 90 and 270 were checked on a Pixel Tablet.
     @Test
     fun naturallyPortraitDisplayTurnsTowardTheNaturalLeftEdge() {
         assertTurns(
             Orientation.Portrait,
             mapOf(
                 DisplayRotation.Rotation0 to Turn.CounterClockwise,
-                DisplayRotation.Rotation90 to Turn.Clockwise,
+                DisplayRotation.Rotation90 to Turn.CounterClockwise,
                 DisplayRotation.Rotation180 to Turn.Clockwise,
                 DisplayRotation.Rotation270 to Turn.Clockwise,
             ),
@@ -115,15 +115,23 @@ class RotateToFitDecisionTest {
         }
     }
 
-    // Both turns are equally close to the target edge in these cases, and clockwise wins.
+    // Both turns are equally close to the target edge in these cases. A naturally landscape display
+    // (a landscape window at rotation 0 or 180) takes clockwise. A naturally portrait display (a
+    // landscape window at rotation 90 or 270) takes the turn toward the natural top edge, which is the
+    // window's left edge at rotation 90 and its right edge at rotation 270.
     @Test
     fun ties() {
         for (rotation in listOf(DisplayRotation.Rotation0, DisplayRotation.Rotation180)) {
             assertEquals(Turn.Clockwise, turn(Orientation.Portrait, Orientation.Landscape, rotation))
         }
-        for (rotation in listOf(DisplayRotation.Rotation90, DisplayRotation.Rotation270)) {
-            assertEquals(Turn.Clockwise, turn(Orientation.Portrait, Orientation.Landscape, rotation))
-        }
+        assertEquals(
+            Turn.CounterClockwise,
+            turn(Orientation.Portrait, Orientation.Landscape, DisplayRotation.Rotation90),
+        )
+        assertEquals(
+            Turn.Clockwise,
+            turn(Orientation.Portrait, Orientation.Landscape, DisplayRotation.Rotation270),
+        )
     }
 
     @Test
