@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import dev.deedles.simpleimageviewer.ui.ImageViewerScreen
+import dev.deedles.simpleimageviewer.ui.Orientation
 
 /**
  * The single Activity for Simple Image Viewer.
@@ -72,10 +73,9 @@ class MainActivity : ComponentActivity() {
     private fun setOptimalOrientation(imageWidth: Int, imageHeight: Int) {
         val desired = if (imageWidth <= 0 || imageHeight <= 0) {
             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        } else if (imageWidth > imageHeight) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        } else when (Orientation.of(imageWidth, imageHeight)) {
+            Orientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            Orientation.Portrait -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
 
         if (requestedOrientation != desired) {

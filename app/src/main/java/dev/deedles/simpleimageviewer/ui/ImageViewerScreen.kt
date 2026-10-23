@@ -41,6 +41,7 @@ fun ImageViewerScreen(
 
     var isMaxBrightness by rememberSaveable { mutableStateOf(false) }
     var isAutoRotateEnabled by rememberSaveable { mutableStateOf(true) }
+    val ignoresOrientationRequests = rememberIgnoresOrientationRequests()
     
     // Store image dimensions to re-apply orientation when toggling auto-rotate
     var imageSize by remember { mutableStateOf<Size?>(null) }
@@ -121,7 +122,9 @@ fun ImageViewerScreen(
                             onOrientationForImage(w, h)
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .rotateToFit(imageSize, enabled = isAutoRotateEnabled && ignoresOrientationRequests)
+                        .fillMaxSize()
                 )
             } else {
                 EmptyState(onOpenPicker = launchPicker)
