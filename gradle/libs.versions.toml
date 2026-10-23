@@ -1,5 +1,5 @@
 [versions]
-agp = "9.2.1"
+agp = "9.4.1"
 kotlin = "2.3.21"  # Used for the Compose compiler plugin (AGP 9 has built-in Kotlin support)
 composeBom = "2026.05.01"
 coreKtx = "1.18.0"
