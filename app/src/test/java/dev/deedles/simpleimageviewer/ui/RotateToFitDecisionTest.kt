@@ -1,8 +1,10 @@
 package dev.deedles.simpleimageviewer.ui
 
+import android.view.Surface
 import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,5 +36,46 @@ class RotateToFitDecisionTest {
     @Test
     fun portraitImageInLandscapeWindowRotates() {
         assertTrue(shouldRotateToFit(Orientation.Portrait, Orientation.Landscape, enabled = true))
+    }
+
+    private fun turn(image: Orientation?, window: Orientation, rotation: DisplayRotation, enabled: Boolean = true) =
+        rotateToFitTurn(image, window, enabled, rotation)
+
+    @Test
+    fun noTurnWhenNoneIsNeeded() {
+        for (rotation in DisplayRotation.entries) {
+            for (orientation in all) assertNull(turn(orientation, orientation, rotation))
+            for (window in all) assertNull(turn(null, window, rotation))
+            assertNull(turn(Orientation.Portrait, Orientation.Landscape, rotation, enabled = false))
+            assertNull(turn(Orientation.Landscape, Orientation.Portrait, rotation, enabled = false))
+        }
+    }
+
+    @Test
+    fun turnsTowardTheNaturalTopEdgeForEveryCombination() {
+        val expected = mapOf(
+            DisplayRotation.Rotation0 to Turn.Clockwise,
+            DisplayRotation.Rotation90 to Turn.CounterClockwise,
+            DisplayRotation.Rotation180 to Turn.Clockwise,
+            DisplayRotation.Rotation270 to Turn.Clockwise,
+        )
+        for ((rotation, want) in expected) {
+            assertEquals(rotation.name, want, turn(Orientation.Portrait, Orientation.Landscape, rotation))
+            assertEquals(rotation.name, want, turn(Orientation.Landscape, Orientation.Portrait, rotation))
+        }
+    }
+
+    @Test
+    fun ties() {
+        assertEquals(Turn.Clockwise, turn(Orientation.Landscape, Orientation.Portrait, DisplayRotation.Rotation0))
+        assertEquals(Turn.Clockwise, turn(Orientation.Landscape, Orientation.Portrait, DisplayRotation.Rotation180))
+    }
+
+    @Test
+    fun displayRotationFromSurfaceConstants() {
+        assertEquals(DisplayRotation.Rotation0, DisplayRotation.ofSurface(Surface.ROTATION_0))
+        assertEquals(DisplayRotation.Rotation90, DisplayRotation.ofSurface(Surface.ROTATION_90))
+        assertEquals(DisplayRotation.Rotation180, DisplayRotation.ofSurface(Surface.ROTATION_180))
+        assertEquals(DisplayRotation.Rotation270, DisplayRotation.ofSurface(Surface.ROTATION_270))
     }
 }

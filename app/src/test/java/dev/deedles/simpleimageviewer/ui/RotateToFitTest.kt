@@ -45,6 +45,7 @@ class RotateToFitTest {
     private var windowHeight by mutableStateOf(800)
     private var imageSize by mutableStateOf<Size?>(portraitImage)
     private var autoRotate by mutableStateOf(true)
+    private var displayRotation by mutableStateOf(DisplayRotation.Rotation0)
 
     private fun show() {
         rule.setContent {
@@ -53,7 +54,7 @@ class RotateToFitTest {
                     uri = Uri.EMPTY,
                     onImageSizeDetermined = { _, _ -> },
                     modifier = Modifier
-                        .rotateToFit(imageSize, enabled = autoRotate)
+                        .rotateToFit(imageSize, enabled = autoRotate, displayRotation = displayRotation)
                         .fillMaxSize()
                 )
             }
@@ -162,11 +163,21 @@ class RotateToFitTest {
         assertRotated()
     }
 
-    @Test
-    fun rotationIsClockwiseSoTheContentsTopFacesTheRightEdge() {
+    // The expectations below follow the Display.getRotation documentation: ROTATION_90 means the drawn
+    // graphics are rotated 90 degrees clockwise from the natural orientation, so the window's left edge is
+    // the device's natural top edge, and ROTATION_270 puts the natural top edge on the window's right.
+    // That convention is from the docs; it has not been checked on a device.
+
+    /** Where the content's top-left and top-right corner markers end up in a window of the given size. */
+    private fun markers(
+        image: Size,
+        width: Int,
+        height: Int,
+        rotation: DisplayRotation,
+    ): Pair<Offset, Offset> {
         rule.setContent {
-            Box(Modifier.size(1280.dp, 800.dp)) {
-                Box(Modifier.rotateToFit(portraitImage, enabled = true).fillMaxSize()) {
+            Box(Modifier.size(width.dp, height.dp)) {
+                Box(Modifier.rotateToFit(image, enabled = true, displayRotation = rotation).fillMaxSize()) {
                     Box(Modifier.size(10.dp).align(Alignment.TopStart).testTag("topStart"))
                     Box(Modifier.size(10.dp).align(Alignment.TopEnd).testTag("topEnd"))
                 }
@@ -174,12 +185,84 @@ class RotateToFitTest {
         }
         val topStart = rule.onNodeWithTag("topStart").fetchSemanticsNode().boundsInRoot.center
         val topEnd = rule.onNodeWithTag("topEnd").fetchSemanticsNode().boundsInRoot.center
-        assertEquals(Offset(1275f, 5f), topStart)
-        assertEquals(Offset(1275f, 795f), topEnd)
+        return topStart to topEnd
+    }
+
+    // Clockwise: the content's top faces the window's right edge.
+    private fun assertTurnedClockwise(markers: Pair<Offset, Offset>, width: Int, height: Int) {
+        assertEquals(Offset(width - 5f, 5f), markers.first)
+        assertEquals(Offset(width - 5f, height - 5f), markers.second)
+    }
+
+    // Counter-clockwise: the content's top faces the window's left edge.
+    private fun assertTurnedCounterClockwise(markers: Pair<Offset, Offset>, width: Int, height: Int) {
+        assertEquals(Offset(5f, height - 5f), markers.first)
+        assertEquals(Offset(5f, 5f), markers.second)
     }
 
     @Test
-    fun doubleTapZoomsTowardsTheTappedPointInScreenDirections() {
+    fun rotation0TurnsClockwiseSoTheContentsTopFacesTheRightEdge() {
+        assertTurnedClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation0), 1280, 800)
+    }
+
+    @Test
+    fun rotation0TurnsLandscapeContentInAPortraitWindowClockwise() {
+        assertTurnedClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation0), 800, 1280)
+    }
+
+    @Test
+    fun rotation90TurnsCounterClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheLeft() {
+        assertTurnedCounterClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation90), 800, 1280)
+    }
+
+    @Test
+    fun rotation90TurnsPortraitContentInALandscapeWindowCounterClockwise() {
+        assertTurnedCounterClockwise(markers(portraitImage, 1280, 800, DisplayRotation.Rotation90), 1280, 800)
+    }
+
+    @Test
+    fun rotation180TurnsClockwise() {
+        assertTurnedClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation180), 800, 1280)
+    }
+
+    @Test
+    fun rotation270TurnsClockwiseSoTheContentsTopFacesTheNaturalTopEdgeOnTheRight() {
+        assertTurnedClockwise(markers(landscapeImage, 800, 1280, DisplayRotation.Rotation270), 800, 1280)
+    }
+
+    @Test
+    fun changingTheDisplayRotationFlipsTheTurnWithoutChangingTheWindow() {
+        rule.setContent {
+            Box(Modifier.size(800.dp, 1280.dp)) {
+                Box(Modifier.rotateToFit(landscapeImage, enabled = true, displayRotation = displayRotation).fillMaxSize()) {
+                    Box(Modifier.size(10.dp).align(Alignment.TopStart).testTag("topStart"))
+                    Box(Modifier.size(10.dp).align(Alignment.TopEnd).testTag("topEnd"))
+                }
+            }
+        }
+        fun markers() = rule.onNodeWithTag("topStart").fetchSemanticsNode().boundsInRoot.center to
+            rule.onNodeWithTag("topEnd").fetchSemanticsNode().boundsInRoot.center
+        assertTurnedClockwise(markers(), 800, 1280)
+        change { displayRotation = DisplayRotation.Rotation90 }
+        assertTurnedCounterClockwise(markers(), 800, 1280)
+        change { displayRotation = DisplayRotation.Rotation180 }
+        assertTurnedClockwise(markers(), 800, 1280)
+        change { displayRotation = DisplayRotation.Rotation270 }
+        assertTurnedClockwise(markers(), 800, 1280)
+        change { displayRotation = DisplayRotation.Rotation90 }
+        assertTurnedCounterClockwise(markers(), 800, 1280)
+    }
+
+    @Test
+    fun doubleTapZoomsTowardsTheTappedPointInScreenDirections() = doubleTapZooms()
+
+    @Test
+    fun doubleTapZoomsTowardsTheTappedPointWhenTurnedCounterClockwise() {
+        displayRotation = DisplayRotation.Rotation90
+        doubleTapZooms()
+    }
+
+    private fun doubleTapZooms() {
         show()
         assertRotated()
         val center = Offset(640f, 400f)
@@ -196,7 +279,15 @@ class RotateToFitTest {
     }
 
     @Test
-    fun dragPansInTheDirectionOfTheFinger() {
+    fun dragPansInTheDirectionOfTheFinger() = dragPans()
+
+    @Test
+    fun dragPansInTheDirectionOfTheFingerWhenTurnedCounterClockwise() {
+        displayRotation = DisplayRotation.Rotation90
+        dragPans()
+    }
+
+    private fun dragPans() {
         show()
         assertRotated()
         val middle = Offset(640f, 400f)

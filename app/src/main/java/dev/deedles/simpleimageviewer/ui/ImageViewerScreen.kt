@@ -41,6 +41,7 @@ fun ImageViewerScreen(
 
     var isMaxBrightness by rememberSaveable { mutableStateOf(false) }
     var isAutoRotateEnabled by rememberSaveable { mutableStateOf(true) }
+    val displayRotation = rememberDisplayRotation()
 
     // Store image dimensions to re-apply orientation when toggling auto-rotate
     var imageSize by remember { mutableStateOf<Size?>(null) }
@@ -122,7 +123,7 @@ fun ImageViewerScreen(
                         }
                     },
                     modifier = Modifier
-                        .rotateToFit(imageSize, enabled = isAutoRotateEnabled)
+                        .rotateToFit(imageSize, enabled = isAutoRotateEnabled, displayRotation = displayRotation)
                         .fillMaxSize()
                 )
             } else {
